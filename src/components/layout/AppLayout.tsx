@@ -22,7 +22,8 @@ const AppLayout = () => {
                 <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50 px-4 py-2">
                     <div className="flex justify-around items-center">
                         <NavButton icon="Home" label="Projetos" to="/" />
-                        <NavButton icon="Settings" label="Config" to="/config" />
+                        <NavButton icon="PlusCircle" label="Templates" to="/templates" />
+                        <NavButton icon="Settings" label="Config" to="/configuracoes" />
                     </div>
                 </nav>
             )}

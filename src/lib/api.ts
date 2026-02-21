@@ -63,7 +63,6 @@ export const createProject = (data: { nome: string; cliente_nome: string; descri
 
 // Feature Endpoints
 export const getFeaturesByProjectId = async (projectId: number): Promise<Feature[]> => {
-  // Atualizado para usar o parametro simples projeto_id=X conforme solicitado
   const response = await request<PaginatedResponse<Feature> | Feature[]>(`/funcionalidades?projeto_id=${projectId}`);
   return extractList(response);
 };
@@ -79,4 +78,49 @@ export const deleteFeature = (id: number): Promise<void> => {
     return request(`/funcionalidades/${id}`, {
         method: 'DELETE',
     });
+};
+
+// Templates Endpoints
+export interface Template {
+  id: number;
+  nome: string;
+  descricao: string;
+  created_at: string;
+}
+
+export const getTemplates = async (): Promise<Template[]> => {
+  const response = await request<PaginatedResponse<Template> | Template[]>('/templates');
+  return extractList(response);
+};
+
+export const createTemplate = (data: { nome: string; descricao: string }): Promise<Template> => {
+  return request('/templates', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const deleteTemplate = (id: number): Promise<void> => {
+  return request(`/templates/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+// Settings Endpoints
+export interface Setting {
+  id: number;
+  chave: string;
+  valor: string;
+}
+
+export const getSettings = async (): Promise<Setting[]> => {
+  const response = await request<PaginatedResponse<Setting> | Setting[]>('/configuracoes');
+  return extractList(response);
+};
+
+export const saveSetting = (data: { chave: string; valor: string }): Promise<Setting> => {
+  return request('/configuracoes', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 };
