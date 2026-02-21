@@ -55,6 +55,7 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS funcionalidades (
     FOREIGN KEY (projeto_id) REFERENCES projetos(id) ON DELETE CASCADE
 )");
 
+// Cria a tabela de Templates automaticamente
 $pdo->exec("CREATE TABLE IF NOT EXISTS templates (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(255) NOT NULL,
@@ -62,6 +63,7 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS templates (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )");
 
+// Cria a tabela de Configurações automaticamente
 $pdo->exec("CREATE TABLE IF NOT EXISTS configuracoes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     chave VARCHAR(50) UNIQUE NOT NULL,
@@ -130,11 +132,11 @@ switch ($resource) {
     case 'templates':
         if ($method === 'GET') {
             $stmt = $pdo->query("SELECT * FROM templates ORDER BY id DESC");
-            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+            echo json_encode(['list' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         } elseif ($method === 'POST') {
             $stmt = $pdo->prepare("INSERT INTO templates (nome, descricao) VALUES (?, ?)");
             $stmt->execute([$input['nome'], $input['descricao'] ?? '']);
-            echo json_encode(['id' => $pdo->lastInsertId()]);
+            echo json_encode(['id' => $pdo->lastInsertId(), 'nome' => $input['nome']]);
         } elseif ($method === 'DELETE') {
             if ($id) {
                 $stmt = $pdo->prepare("DELETE FROM templates WHERE id = ?");
@@ -147,7 +149,7 @@ switch ($resource) {
     case 'configuracoes':
         if ($method === 'GET') {
             $stmt = $pdo->query("SELECT * FROM configuracoes");
-            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+            echo json_encode(['list' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         } elseif ($method === 'POST') {
             $stmt = $pdo->prepare("INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = ?");
             $stmt->execute([$input['chave'], $input['valor'], $input['valor']]);
