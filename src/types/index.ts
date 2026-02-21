@@ -19,7 +19,6 @@ export interface Project {
   created_at: string;
 }
 
-// The API list response is nested under "list"
 export interface PaginatedResponse<T> {
   list: T[];
   pageInfo: {

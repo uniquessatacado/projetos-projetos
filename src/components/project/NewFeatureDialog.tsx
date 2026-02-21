@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { Feature } from '@/types';
 
@@ -37,13 +36,13 @@ export const NewFeatureDialog = ({ projectId, children }: NewFeatureDialogProps)
   });
 
   const mutation = useMutation<Feature, Error, FeatureFormData>({
-    mutationFn: (data) => {
-      const payload: Omit<Feature, 'id'> = {
-        ...data,
+    mutationFn: (formData) => createFeature({
+        titulo: formData.titulo,
+        complexidade: formData.complexidade,
+        descricao: formData.descricao,
+        categoria: formData.categoria,
         projeto_id: projectId,
-      };
-      return createFeature(payload);
-    },
+    }),
     onSuccess: () => {
       showSuccess('Funcionalidade adicionada!');
       queryClient.invalidateQueries({ queryKey: ['features', projectId] });
