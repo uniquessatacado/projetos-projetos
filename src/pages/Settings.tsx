@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { showSuccess, showError } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DeployApiButton } from "@/components/DeployApiButton";
 
 interface SettingsForm {
   empresa_nome: string;
@@ -55,7 +56,10 @@ const Settings = () => {
 
   return (
     <div className="p-4 lg:p-8 animate-slide-up">
-      <h1 className="text-3xl font-bold text-slate-800 mb-8">Configurações</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-slate-800">Configurações</h1>
+        <DeployApiButton />
+      </div>
       
       <Card className="max-w-2xl">
         <CardHeader>
