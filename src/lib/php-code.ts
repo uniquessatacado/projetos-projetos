@@ -37,8 +37,15 @@ function getPdo() {
     }
 }
 
+function addColumnIfMissing($pdo, $table, $column, $definition) {
+    $stmt = $pdo->query("SHOW COLUMNS FROM \`$table\` LIKE '$column'");
+    if ($stmt->rowCount() == 0) {
+        $pdo->exec("ALTER TABLE \`$table\` ADD \`$column\` $definition");
+    }
+}
+
 function initTables($pdo) {
-    // Projetos - Atualizado com controle de tempo e workflow
+    // Projetos
     $pdo->exec("CREATE TABLE IF NOT EXISTS projetos (
         id INT AUTO_INCREMENT PRIMARY KEY,
         nome VARCHAR(255) NOT NULL,
@@ -46,25 +53,28 @@ function initTables($pdo) {
         descricao TEXT,
         status VARCHAR(50) DEFAULT 'aguardando_inicio',
         prazo_entrega DATE,
-        started_at TIMESTAMP NULL,
-        finished_at TIMESTAMP NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB");
 
-    // Funcionalidades - Atualizado com status de progresso e observações
+    addColumnIfMissing($pdo, 'projetos', 'started_at', 'TIMESTAMP NULL');
+    addColumnIfMissing($pdo, 'projetos', 'finished_at', 'TIMESTAMP NULL');
+
+    // Funcionalidades
     $pdo->exec("CREATE TABLE IF NOT EXISTS funcionalidades (
         id INT AUTO_INCREMENT PRIMARY KEY,
         projeto_id INT NOT NULL,
         titulo VARCHAR(255) NOT NULL,
-        descricao TEXT,
-        observacoes TEXT,
-        status VARCHAR(50) DEFAULT 'pendente',
         complexidade VARCHAR(50) NOT NULL,
-        data_programada DATE,
-        ordem INT DEFAULT 0,
         FOREIGN KEY (projeto_id) REFERENCES projetos(id) ON DELETE CASCADE
     ) ENGINE=InnoDB");
 
+    addColumnIfMissing($pdo, 'funcionalidades', 'descricao', 'TEXT');
+    addColumnIfMissing($pdo, 'funcionalidades', 'observacoes', 'TEXT');
+    addColumnIfMissing($pdo, 'funcionalidades', 'status', "VARCHAR(50) DEFAULT 'pendente'");
+    addColumnIfMissing($pdo, 'funcionalidades', 'ordem', 'INT DEFAULT 0');
+    addColumnIfMissing($pdo, 'funcionalidades', 'data_programada', 'DATE');
+
+    // Outras Tabelas
     $pdo->exec("CREATE TABLE IF NOT EXISTS templates (
         id INT AUTO_INCREMENT PRIMARY KEY,
         nome VARCHAR(255) NOT NULL,
@@ -96,24 +106,21 @@ try {
                 if ($id) {
                     $stmt = $pdo->prepare("SELECT * FROM projetos WHERE id = ?");
                     $stmt->execute([$id]);
-                    echo json_encode($stmt->fetch(PDO::FETCH_ASSOC));
+                    $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                    echo json_encode($res ?: new stdClass());
                 } else {
                     $stmt = $pdo->query("SELECT * FROM projetos ORDER BY id DESC");
                     echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
                 }
             } elseif ($method === 'POST') {
-                if ($id) { // UPDATE
-                    $fields = [];
-                    $params = [];
-                    foreach($input as $key => $val) {
-                        $fields[] = "$key = ?";
-                        $params[] = $val;
-                    }
+                if ($id) {
+                    $fields = []; $params = [];
+                    foreach($input as $k => $v) { $fields[] = "\`$k\` = ?"; $params[] = $v; }
                     $params[] = $id;
                     $stmt = $pdo->prepare("UPDATE projetos SET " . implode(', ', $fields) . " WHERE id = ?");
                     $stmt->execute($params);
                     echo json_encode(['success' => true]);
-                } else { // CREATE
+                } else {
                     $stmt = $pdo->prepare("INSERT INTO projetos (nome, cliente_nome, descricao, prazo_entrega) VALUES (?, ?, ?, ?)");
                     $stmt->execute([$input['nome'], $input['cliente_nome'], $input['descricao'] ?? '', $input['prazo_entrega'] ?? null]);
                     echo json_encode(['id' => $pdo->lastInsertId()]);
@@ -123,23 +130,19 @@ try {
 
         case 'funcionalidades':
             if ($method === 'GET') {
-                $projeto_id = $_GET['projeto_id'] ?? null;
+                $projeto_id = $_GET['projeto_id'] ?? 0;
                 $stmt = $pdo->prepare("SELECT * FROM funcionalidades WHERE projeto_id = ? ORDER BY ordem ASC, id ASC");
                 $stmt->execute([$projeto_id]);
                 echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
             } elseif ($method === 'POST') {
-                if ($id) { // UPDATE
-                    $fields = [];
-                    $params = [];
-                    foreach($input as $key => $val) {
-                        $fields[] = "$key = ?";
-                        $params[] = $val;
-                    }
+                if ($id) {
+                    $fields = []; $params = [];
+                    foreach($input as $k => $v) { $fields[] = "\`$k\` = ?"; $params[] = $v; }
                     $params[] = $id;
                     $stmt = $pdo->prepare("UPDATE funcionalidades SET " . implode(', ', $fields) . " WHERE id = ?");
                     $stmt->execute($params);
                     echo json_encode(['success' => true]);
-                } else { // CREATE
+                } else {
                     $stmt = $pdo->prepare("INSERT INTO funcionalidades (projeto_id, titulo, complexidade, descricao, ordem) VALUES (?, ?, ?, ?, ?)");
                     $stmt->execute([$input['projeto_id'], $input['titulo'], $input['complexidade'], $input['descricao'] ?? '', $input['ordem'] ?? 0]);
                     echo json_encode(['id' => $pdo->lastInsertId()]);
@@ -147,7 +150,7 @@ try {
             } elseif ($method === 'DELETE' && $id) {
                 $stmt = $pdo->prepare("DELETE FROM funcionalidades WHERE id = ?");
                 $stmt->execute([$id]);
-                http_response_code(204);
+                echo json_encode(['success' => true]);
             }
             break;
 
@@ -162,7 +165,7 @@ try {
             } elseif ($method === 'DELETE' && $id) {
                 $stmt = $pdo->prepare("DELETE FROM templates WHERE id = ?");
                 $stmt->execute([$id]);
-                http_response_code(204);
+                echo json_encode(['success' => true]);
             }
             break;
 
@@ -179,7 +182,7 @@ try {
 
         default:
             http_response_code(404);
-            echo json_encode(['message' => 'Endpoint não encontrado']);
+            echo json_encode(['error' => 'Endpoint não encontrado']);
             break;
     }
 } catch (Exception $e) {
