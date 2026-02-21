@@ -10,13 +10,13 @@ export const DeployApiButton = () => {
   const handleDeploy = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://206.183.128.27:3001/update-api.php', {
+      const response = await fetch('http://206.183.128.27:3001/api.php?path=update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          token: "dyad-vai-123",
+          token: "dyad-auto-2024",
           code: PHP_API_CODE
         }),
       });
@@ -25,7 +25,8 @@ export const DeployApiButton = () => {
         throw new Error('Falha ao atualizar API');
       }
 
-      showSuccess('API atualizada com sucesso no servidor!');
+      const data = await response.json();
+      showSuccess(data.message || 'API atualizada com sucesso!');
     } catch (error) {
       showError('Erro ao atualizar API. Verifique o console.');
       console.error(error);

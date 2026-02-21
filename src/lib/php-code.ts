@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $host = 'localhost';
 $db   = 'gestor_escopos'; 
 $user = 'root';
-$pass = 'root'; // Ajuste conforme necessário
+$pass = 'root'; 
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
@@ -55,7 +55,6 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS funcionalidades (
     FOREIGN KEY (projeto_id) REFERENCES projetos(id) ON DELETE CASCADE
 )");
 
-// Cria a tabela de Templates automaticamente
 $pdo->exec("CREATE TABLE IF NOT EXISTS templates (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(255) NOT NULL,
@@ -63,7 +62,6 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS templates (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )");
 
-// Cria a tabela de Configurações automaticamente
 $pdo->exec("CREATE TABLE IF NOT EXISTS configuracoes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     chave VARCHAR(50) UNIQUE NOT NULL,
@@ -82,6 +80,31 @@ $id = isset($pathParts[1]) ? $pathParts[1] : null;
 $input = json_decode(file_get_contents('php://input'), true);
 
 switch ($resource) {
+    case 'update':
+        if ($method === 'POST') {
+            if (!isset($input['token']) || $input['token'] !== 'dyad-auto-2024') {
+                http_response_code(403);
+                echo json_encode(['error' => 'Token invalido']);
+                exit;
+            }
+
+            if (!isset($input['code'])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Codigo nao fornecido']);
+                exit;
+            }
+
+            // Backup simples do arquivo atual
+            $backupFile = __FILE__ . '.bak';
+            copy(__FILE__, $backupFile);
+
+            // Sobrescreve o próprio arquivo com o novo código
+            file_put_contents(__FILE__, $input['code']);
+            
+            echo json_encode(['status' => 'updated', 'message' => 'API atualizada com sucesso. Backup salvo.']);
+        }
+        break;
+
     case 'projetos':
         if ($method === 'GET') {
             if ($id) {
@@ -138,9 +161,10 @@ switch ($resource) {
             $stmt->execute([$input['nome'], $input['descricao'] ?? '']);
             echo json_encode(['id' => $pdo->lastInsertId(), 'nome' => $input['nome']]);
         } elseif ($method === 'DELETE') {
-            if ($id) {
+            $delId = $id ?? $_GET['id'] ?? null;
+            if ($delId) {
                 $stmt = $pdo->prepare("DELETE FROM templates WHERE id = ?");
-                $stmt->execute([$id]);
+                $stmt->execute([$delId]);
                 echo json_encode(['status' => 'deleted']);
             }
         }
@@ -159,7 +183,7 @@ switch ($resource) {
         
     default:
         http_response_code(404);
-        echo json_encode(['message' => 'Endpoint not found']);
+        echo json_encode(['message' => 'Endpoint not found: ' . $resource]);
         break;
 }
 ?>`;
