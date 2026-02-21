@@ -8,7 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
 }
 
-// CONFIGURAÇÕES DO BANCO DE DADOS (MEMORIZADAS)
+// CONFIGURAÇÕES OBRIGATÓRIAS
 $host = '172.22.0.2';
 $db   = 'projetos'; 
 $user = 'root';
@@ -38,24 +38,24 @@ function getPdo() {
 }
 
 function initTables($pdo) {
-    // Projetos
+    // Projetos - Usando VARCHAR(50) para status conforme regra
     $pdo->exec("CREATE TABLE IF NOT EXISTS projetos (
         id INT AUTO_INCREMENT PRIMARY KEY,
         nome VARCHAR(255) NOT NULL,
         cliente_nome VARCHAR(255) NOT NULL,
         descricao TEXT,
-        status ENUM('rascunho', 'analise', 'em_desenvolvimento', 'concluido') DEFAULT 'rascunho',
+        status VARCHAR(50) DEFAULT 'rascunho',
         prazo_estimado_dias INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB");
 
-    // Funcionalidades
+    // Funcionalidades - Usando VARCHAR(50) para complexidade conforme regra
     $pdo->exec("CREATE TABLE IF NOT EXISTS funcionalidades (
         id INT AUTO_INCREMENT PRIMARY KEY,
         projeto_id INT NOT NULL,
         titulo VARCHAR(255) NOT NULL,
         descricao TEXT,
-        complexidade ENUM('simples', 'moderada', 'complexa', 'muito_complexa', 'critica') NOT NULL,
+        complexidade VARCHAR(50) NOT NULL,
         categoria VARCHAR(100),
         tempo_estimado_horas INT DEFAULT 0,
         ordem INT DEFAULT 0,
@@ -109,8 +109,8 @@ try {
                     echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
                 }
             } elseif ($method === 'POST') {
-                $stmt = $pdo->prepare("INSERT INTO projetos (nome, cliente_nome, descricao) VALUES (?, ?, ?)");
-                $stmt->execute([$input['nome'], $input['cliente_nome'], $input['descricao'] ?? '']);
+                $stmt = $pdo->prepare("INSERT INTO projetos (nome, cliente_nome, descricao, status) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$input['nome'], $input['cliente_nome'], $input['descricao'] ?? '', $input['status'] ?? 'rascunho']);
                 echo json_encode(['id' => $pdo->lastInsertId()]);
             }
             break;
