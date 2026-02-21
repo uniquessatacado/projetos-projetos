@@ -1,17 +1,20 @@
 import ProjectCard from "@/components/project/ProjectCard";
 import { NewProjectDialog } from "@/components/project/NewProjectDialog";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, AlertCircle, RefreshCw } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getProjects } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const { data: projects, isLoading, isError } = useQuery({
+  const { data: projects, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['projects'],
     queryFn: getProjects,
+    retry: 1,
   });
 
   const filteredProjects = projects?.filter(project => 
@@ -41,7 +44,31 @@ const Dashboard = () => {
       </header>
 
       {isLoading && <DashboardSkeleton />}
-      {isError && <p className="text-center text-red-500">Falha ao carregar projetos.</p>}
+      
+      {isError && (
+        <Alert variant="destructive" className="mb-6 max-w-2xl mx-auto border-red-200 bg-red-50">
+          <AlertCircle className="h-5 w-5" />
+          <AlertTitle>Erro na Conexão com o Backend</AlertTitle>
+          <AlertDescription className="mt-2">
+            <p className="font-mono text-xs bg-white/50 p-2 rounded mb-3">
+              {error instanceof Error ? error.message : 'Não foi possível conectar ao servidor.'}
+            </p>
+            <div className="flex flex-col gap-2">
+              <p className="text-sm">
+                Se o erro for <strong>"Failed to fetch"</strong>, você precisa permitir <strong>"Conteúdo Inseguro"</strong> nas configurações do seu navegador para este site, pois a API usa HTTP e este site usa HTTPS.
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => refetch()}
+                className="w-fit"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" /> Tentar Novamente
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
       
       {!isLoading && !isError && filteredProjects && (
         <>
