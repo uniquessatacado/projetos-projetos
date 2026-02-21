@@ -19,15 +19,10 @@ function getPdo() {
     try {
         $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        static $initialized = false;
-        if (!$initialized) {
-            initTables($pdo);
-            $initialized = true;
-        }
+        initTables($pdo);
         return $pdo;
     } catch (PDOException $e) {
         try {
-            // Tenta criar o banco caso não exista
             $pdo = new PDO("mysql:host=$host;charset=utf8", $user, $pass);
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $pdo->exec("CREATE DATABASE IF NOT EXISTS \`$db\`");
@@ -36,7 +31,7 @@ function getPdo() {
             return $pdo;
         } catch (PDOException $e2) {
             http_response_code(500);
-            echo json_encode(['error' => 'Erro de conexão: ' . $e2->getMessage()]);
+            echo json_encode(['error' => 'Falha na conexão: ' . $e2->getMessage()]);
             exit;
         }
     }
@@ -52,7 +47,7 @@ function initTables($pdo) {
         status ENUM('rascunho', 'analise', 'em_desenvolvimento', 'concluido') DEFAULT 'rascunho',
         prazo_estimado_dias INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )");
+    ) ENGINE=InnoDB");
 
     // Funcionalidades
     $pdo->exec("CREATE TABLE IF NOT EXISTS funcionalidades (
@@ -65,7 +60,7 @@ function initTables($pdo) {
         tempo_estimado_horas INT DEFAULT 0,
         ordem INT DEFAULT 0,
         FOREIGN KEY (projeto_id) REFERENCES projetos(id) ON DELETE CASCADE
-    )");
+    ) ENGINE=InnoDB");
 
     // Templates
     $pdo->exec("CREATE TABLE IF NOT EXISTS templates (
@@ -73,7 +68,7 @@ function initTables($pdo) {
         nome VARCHAR(255) NOT NULL,
         descricao TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )");
+    ) ENGINE=InnoDB");
 
     // Configurações
     $pdo->exec("CREATE TABLE IF NOT EXISTS configuracoes (
@@ -81,7 +76,7 @@ function initTables($pdo) {
         chave VARCHAR(50) UNIQUE NOT NULL,
         valor TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )");
+    ) ENGINE=InnoDB");
 
     // Tarefas
     $pdo->exec("CREATE TABLE IF NOT EXISTS tarefas (
@@ -89,7 +84,7 @@ function initTables($pdo) {
         titulo VARCHAR(255) NOT NULL,
         concluida TINYINT(1) DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )");
+    ) ENGINE=InnoDB");
 }
 
 $path = isset($_GET['path']) ? $_GET['path'] : '';
@@ -99,82 +94,88 @@ $resource = $pathParts[0];
 $id = isset($pathParts[1]) ? $pathParts[1] : null;
 $input = json_decode(file_get_contents('php://input'), true);
 
-switch ($resource) {
-    case 'projetos':
-        $pdo = getPdo();
-        if ($method === 'GET') {
-            if ($id) {
-                $stmt = $pdo->prepare("SELECT * FROM projetos WHERE id = ?");
-                $stmt->execute([$id]);
-                echo json_encode($stmt->fetch(PDO::FETCH_ASSOC));
-            } else {
-                $stmt = $pdo->query("SELECT * FROM projetos ORDER BY id DESC");
-                echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+try {
+    $pdo = getPdo();
+    
+    switch ($resource) {
+        case 'projetos':
+            if ($method === 'GET') {
+                if ($id) {
+                    $stmt = $pdo->prepare("SELECT * FROM projetos WHERE id = ?");
+                    $stmt->execute([$id]);
+                    echo json_encode($stmt->fetch(PDO::FETCH_ASSOC));
+                } else {
+                    $stmt = $pdo->query("SELECT * FROM projetos ORDER BY id DESC");
+                    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+                }
+            } elseif ($method === 'POST') {
+                $stmt = $pdo->prepare("INSERT INTO projetos (nome, cliente_nome, descricao) VALUES (?, ?, ?)");
+                $stmt->execute([$input['nome'], $input['cliente_nome'], $input['descricao'] ?? '']);
+                echo json_encode(['id' => $pdo->lastInsertId()]);
             }
-        } elseif ($method === 'POST') {
-            $stmt = $pdo->prepare("INSERT INTO projetos (nome, cliente_nome, descricao) VALUES (?, ?, ?)");
-            $stmt->execute([$input['nome'], $input['cliente_nome'], $input['descricao'] ?? '']);
-            echo json_encode(['id' => $pdo->lastInsertId()]);
-        }
-        break;
+            break;
 
-    case 'funcionalidades':
-        $pdo = getPdo();
-        if ($method === 'GET') {
-            $projeto_id = $_GET['projeto_id'] ?? null;
-            $stmt = $pdo->prepare("SELECT * FROM funcionalidades WHERE projeto_id = ? ORDER BY id ASC");
-            $stmt->execute([$projeto_id]);
-            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-        } elseif ($method === 'POST') {
-            $stmt = $pdo->prepare("INSERT INTO funcionalidades (projeto_id, titulo, complexidade, descricao) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$input['projeto_id'], $input['titulo'], $input['complexidade'], $input['descricao'] ?? '']);
-            echo json_encode(['id' => $pdo->lastInsertId()]);
-        }
-        break;
+        case 'funcionalidades':
+            if ($method === 'GET') {
+                $projeto_id = $_GET['projeto_id'] ?? null;
+                $stmt = $pdo->prepare("SELECT * FROM funcionalidades WHERE projeto_id = ? ORDER BY id ASC");
+                $stmt->execute([$projeto_id]);
+                echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+            } elseif ($method === 'POST') {
+                $stmt = $pdo->prepare("INSERT INTO funcionalidades (projeto_id, titulo, complexidade, descricao) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$input['projeto_id'], $input['titulo'], $input['complexidade'], $input['descricao'] ?? '']);
+                echo json_encode(['id' => $pdo->lastInsertId()]);
+            } elseif ($method === 'DELETE' && $id) {
+                $stmt = $pdo->prepare("DELETE FROM funcionalidades WHERE id = ?");
+                $stmt->execute([$id]);
+                http_response_code(204);
+            }
+            break;
 
-    case 'tarefas':
-        $pdo = getPdo();
-        if ($method === 'GET') {
-            $stmt = $pdo->query("SELECT * FROM tarefas ORDER BY id DESC");
-            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-        } elseif ($method === 'POST') {
-            $stmt = $pdo->prepare("INSERT INTO tarefas (titulo) VALUES (?)");
-            $stmt->execute([$input['titulo']]);
-            echo json_encode(['id' => $pdo->lastInsertId()]);
-        }
-        break;
+        case 'tarefas':
+            if ($method === 'GET') {
+                $stmt = $pdo->query("SELECT * FROM tarefas ORDER BY id DESC");
+                echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+            } elseif ($method === 'POST') {
+                $stmt = $pdo->prepare("INSERT INTO tarefas (titulo) VALUES (?)");
+                $stmt->execute([$input['titulo']]);
+                echo json_encode(['id' => $pdo->lastInsertId()]);
+            }
+            break;
 
-    case 'templates':
-        $pdo = getPdo();
-        if ($method === 'GET') {
-            $stmt = $pdo->query("SELECT * FROM templates ORDER BY id DESC");
-            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-        } elseif ($method === 'POST') {
-            $stmt = $pdo->prepare("INSERT INTO templates (nome, descricao) VALUES (?, ?)");
-            $stmt->execute([$input['nome'], $input['descricao'] ?? '']);
-            echo json_encode(['id' => $pdo->lastInsertId()]);
-        } elseif ($method === 'DELETE' && $id) {
-            $stmt = $pdo->prepare("DELETE FROM templates WHERE id = ?");
-            $stmt->execute([$id]);
-            http_response_code(204);
-        }
-        break;
+        case 'templates':
+            if ($method === 'GET') {
+                $stmt = $pdo->query("SELECT * FROM templates ORDER BY id DESC");
+                echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+            } elseif ($method === 'POST') {
+                $stmt = $pdo->prepare("INSERT INTO templates (nome, descricao) VALUES (?, ?)");
+                $stmt->execute([$input['nome'], $input['descricao'] ?? '']);
+                echo json_encode(['id' => $pdo->lastInsertId()]);
+            } elseif ($method === 'DELETE' && $id) {
+                $stmt = $pdo->prepare("DELETE FROM templates WHERE id = ?");
+                $stmt->execute([$id]);
+                http_response_code(204);
+            }
+            break;
 
-    case 'configuracoes':
-        $pdo = getPdo();
-        if ($method === 'GET') {
-            $stmt = $pdo->query("SELECT * FROM configuracoes");
-            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-        } elseif ($method === 'POST') {
-            $stmt = $pdo->prepare("INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)");
-            $stmt->execute([$input['chave'], $input['valor']]);
-            echo json_encode(['success' => true]);
-        }
-        break;
+        case 'configuracoes':
+            if ($method === 'GET') {
+                $stmt = $pdo->query("SELECT * FROM configuracoes");
+                echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+            } elseif ($method === 'POST') {
+                $stmt = $pdo->prepare("INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)");
+                $stmt->execute([$input['chave'], $input['valor']]);
+                echo json_encode(['success' => true]);
+            }
+            break;
 
-    default:
-        http_response_code(404);
-        echo json_encode(['message' => 'Endpoint not found']);
-        break;
+        default:
+            http_response_code(404);
+            echo json_encode(['message' => 'Endpoint não encontrado']);
+            break;
+    }
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['error' => $e->getMessage()]);
 }
 ?>`;
