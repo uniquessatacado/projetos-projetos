@@ -83,6 +83,14 @@ function initTables($pdo) {
         valor TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )");
+
+    // TABELA DE TESTE PARA VALIDAÇÃO
+    $pdo->exec("CREATE TABLE IF NOT EXISTS tarefas_teste (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        titulo VARCHAR(255) NOT NULL,
+        concluida TINYINT(1) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )");
 }
 
 // --- ROTEAMENTO ---
@@ -193,6 +201,18 @@ switch ($resource) {
             $stmt = $pdo->prepare("INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = ?");
             $stmt->execute([$input['chave'], $input['valor'], $input['valor']]);
             echo json_encode(['status' => 'saved']);
+        }
+        break;
+
+    case 'tarefas_teste':
+        $pdo = getPdo();
+        if ($method === 'GET') {
+            $stmt = $pdo->query("SELECT * FROM tarefas_teste ORDER BY id DESC");
+            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+        } elseif ($method === 'POST') {
+            $stmt = $pdo->prepare("INSERT INTO tarefas_teste (titulo) VALUES (?)");
+            $stmt->execute([$input['titulo']]);
+            echo json_encode(['id' => $pdo->lastInsertId(), 'status' => 'criado']);
         }
         break;
         
