@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Server, RefreshCw } from 'lucide-react';
+import { Server, RefreshCw, AlertTriangle } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { PHP_API_CODE } from '@/lib/php-code';
 
@@ -10,25 +10,25 @@ export const DeployApiButton = () => {
   const handleDeploy = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://206.183.128.27:3001/api.php?path=update', {
+      // Usando o endpoint de resgate 'update-api.php' pois o 'api.php' está travado com Erro 500
+      const response = await fetch('http://206.183.128.27:3001/update-api.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          token: "dyad-auto-2024",
+          token: "dyad-vai-123", // Token antigo para o script de resgate
           code: PHP_API_CODE
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Falha ao atualizar API');
+        throw new Error('Falha ao restaurar API');
       }
 
-      const data = await response.json();
-      showSuccess(data.message || 'API atualizada com sucesso!');
+      showSuccess('API restaurada com sucesso! Tente atualizar a página.');
     } catch (error) {
-      showError('Erro ao atualizar API. Verifique o console.');
+      showError('Erro ao restaurar API. Verifique o console.');
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -40,14 +40,14 @@ export const DeployApiButton = () => {
       onClick={handleDeploy} 
       disabled={isLoading}
       variant="outline"
-      className="border-primary-200 text-primary-700 hover:bg-primary-50"
+      className="border-amber-200 text-amber-700 hover:bg-amber-50"
     >
       {isLoading ? (
         <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
       ) : (
-        <Server className="w-4 h-4 mr-2" />
+        <AlertTriangle className="w-4 h-4 mr-2" />
       )}
-      {isLoading ? 'Atualizando...' : 'Atualizar API Remota'}
+      {isLoading ? 'Restaurando...' : 'Restaurar API (Resgate)'}
     </Button>
   );
 };
