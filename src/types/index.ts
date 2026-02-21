@@ -3,9 +3,10 @@ export interface Feature {
   projeto_id: number;
   titulo: string;
   descricao?: string;
-  complexidade: 'simples' | 'moderada' | 'complexa' | 'muito_complexa';
+  complexidade: 'simples' | 'moderada' | 'complexa' | 'muito_complexa' | 'critica';
   categoria?: string;
-  tempo_estimado_horas: number;
+  tempo_estimado_horas?: number;
+  ordem?: number;
 }
 
 export interface Project {
@@ -16,5 +17,15 @@ export interface Project {
   status: 'rascunho' | 'analise' | 'em_desenvolvimento' | 'concluido';
   prazo_estimado_dias: number;
   created_at: string;
-  funcionalidades?: Feature[];
+}
+
+// The API list response is nested under "list"
+export interface PaginatedResponse<T> {
+  list: T[];
+  pageInfo: {
+    totalRows: number;
+    page: number;
+    pageSize: number;
+    isLastPage: boolean;
+  };
 }

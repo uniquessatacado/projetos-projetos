@@ -1,4 +1,4 @@
-import { Project, Feature } from "@/types";
+import { Project, Feature, PaginatedResponse } from "@/types";
 
 const API_BASE_URL = "http://206.183.128.27:8082/api/v1";
 
@@ -16,7 +16,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     throw new Error(errorData.message || 'Ocorreu um erro na requisição.');
   }
   
-  if (response.status === 204) { // No Content
+  if (response.status === 204) {
     return null as T;
   }
 
@@ -24,8 +24,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 // Project Endpoints
-export const getProjects = (): Promise<Project[]> => request('/projetos');
+export const getProjects = async (): Promise<Project[]> => {
+  const response = await request<PaginatedResponse<Project>>('/projetos');
+  return response.list;
+};
+
 export const getProjectById = (id: string): Promise<Project> => request(`/projetos/${id}`);
+
 export const createProject = (data: { nome: string; cliente_nome: string; descricao?: string }): Promise<Project> => {
   return request('/projetos', {
     method: 'POST',
@@ -34,7 +39,12 @@ export const createProject = (data: { nome: string; cliente_nome: string; descri
 };
 
 // Feature Endpoints
-export const createFeature = (data: { projeto_id: number; titulo: string; complexidade: string; categoria?: string, descricao?: string }): Promise<Feature> => {
+export const getFeaturesByProjectId = async (projectId: number): Promise<Feature[]> => {
+  const response = await request<PaginatedResponse<Feature>>(`/funcionalidades?where=(projeto_id,eq,${projectId})`);
+  return response.list;
+};
+
+export const createFeature = (data: Omit<Feature, 'id'>): Promise<Feature> => {
     return request('/funcionalidades', {
         method: 'POST',
         body: JSON.stringify(data),
