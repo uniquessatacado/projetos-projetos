@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Server, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Server, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { PHP_API_CODE } from '@/lib/php-code';
 
@@ -10,25 +10,32 @@ export const DeployApiButton = () => {
   const handleDeploy = async () => {
     setIsLoading(true);
     try {
-      // Usando o endpoint de resgate 'update-api.php' pois o 'api.php' está travado com Erro 500
+      // Endpoint dedicado para atualização segura
       const response = await fetch('http://206.183.128.27:3001/update-api.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          token: "dyad-vai-123", // Token antigo para o script de resgate
+          token: "dyad-auto-2024",
           code: PHP_API_CODE
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Falha ao restaurar API');
+        throw new Error('Falha na comunicação com o servidor de atualização.');
       }
 
-      showSuccess('API restaurada com sucesso! Tente atualizar a página.');
+      const data = await response.json();
+      
+      // O script PHP pode retornar erro 200 com mensagem de erro no JSON
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      showSuccess('Backend atualizado com sucesso!');
     } catch (error) {
-      showError('Erro ao restaurar API. Verifique o console.');
+      showError(error instanceof Error ? error.message : 'Erro desconhecido ao atualizar API.');
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -40,14 +47,14 @@ export const DeployApiButton = () => {
       onClick={handleDeploy} 
       disabled={isLoading}
       variant="outline"
-      className="border-amber-200 text-amber-700 hover:bg-amber-50"
+      className="border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800 hover:border-green-300 transition-colors"
     >
       {isLoading ? (
         <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
       ) : (
-        <AlertTriangle className="w-4 h-4 mr-2" />
+        <Server className="w-4 h-4 mr-2" />
       )}
-      {isLoading ? 'Restaurando...' : 'Restaurar API (Resgate)'}
+      {isLoading ? 'Enviando Código...' : 'Atualizar Backend PHP'}
     </Button>
   );
 };

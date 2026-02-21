@@ -14,7 +14,7 @@ $db   = 'gestor_escopos';
 $user = 'root';
 $pass = 'root'; 
 
-// Função para conectar ao banco apenas quando necessário
+// Função para conectar ao banco apenas quando necessário (Lazy Connection)
 function getPdo() {
     global $host, $db, $user, $pass;
     
@@ -22,8 +22,7 @@ function getPdo() {
         $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         
-        // Garante que as tabelas existam (Auto-Migration)
-        // Isso roda na primeira conexão bem sucedida
+        // Garante que as tabelas existam (Auto-Migration) na primeira conexão
         static $initialized = false;
         if (!$initialized) {
             initTables($pdo);
@@ -32,7 +31,7 @@ function getPdo() {
         
         return $pdo;
     } catch (PDOException $e) {
-        // Tenta criar o banco se não existir
+        // Se a conexão falhar, tenta conectar sem o DB para criá-lo
         try {
             $pdo = new PDO("mysql:host=$host;charset=utf8", $user, $pass);
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -97,26 +96,23 @@ $id = isset($pathParts[1]) ? $pathParts[1] : null;
 $input = json_decode(file_get_contents('php://input'), true);
 
 switch ($resource) {
+    // Rota de auto-update interna (backup)
     case 'update':
-        // Rota de auto-atualização (NÃO depende de conexão com banco)
         if ($method === 'POST') {
             if (!isset($input['token']) || $input['token'] !== 'dyad-auto-2024') {
                 http_response_code(403);
                 echo json_encode(['error' => 'Token invalido']);
                 exit;
             }
-
             if (!isset($input['code'])) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Codigo nao fornecido']);
                 exit;
             }
-
             $backupFile = __FILE__ . '.bak';
             copy(__FILE__, $backupFile);
             file_put_contents(__FILE__, $input['code']);
-            
-            echo json_encode(['status' => 'updated', 'message' => 'API atualizada com sucesso.']);
+            echo json_encode(['status' => 'updated', 'message' => 'API atualizada internamente.']);
         }
         break;
 
