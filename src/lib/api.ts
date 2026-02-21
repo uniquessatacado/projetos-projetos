@@ -1,6 +1,7 @@
 import { Project, Feature, PaginatedResponse } from "@/types";
 
-const API_BASE_URL = "http://206.183.128.27:8082/api/v1";
+// Atualizado com o ID do projeto NocoDB
+const API_BASE_URL = "http://206.183.128.27:8082/api/v1/pw95ayzfy28vas3";
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
