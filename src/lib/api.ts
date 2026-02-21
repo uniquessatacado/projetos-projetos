@@ -6,6 +6,7 @@ const API_BASE_URL = "http://206.183.128.27:3001/api.php";
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = new URL(API_BASE_URL);
   
+  // Lógica para converter /recurso?param=valor em ?path=recurso&param=valor
   const [pathString, queryString] = endpoint.split('?');
   const cleanPath = pathString.startsWith('/') ? pathString.substring(1) : pathString;
   
@@ -37,6 +38,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return response.json();
 }
 
+// Helper para tratar respostas que podem ser array direto ou objeto paginado { list: [] }
 function extractList<T>(response: PaginatedResponse<T> | T[]): T[] {
   if (Array.isArray(response)) {
     return response;
@@ -121,14 +123,4 @@ export const saveSetting = (data: { chave: string; valor: string }): Promise<Set
     method: 'POST',
     body: JSON.stringify(data),
   });
-};
-
-// Test Endpoint for Migration Validation
-export const getTarefasTeste = async (): Promise<any[]> => {
-    try {
-        const response = await request<any[]>('/tarefas_teste');
-        return Array.isArray(response) ? response : [];
-    } catch (e) {
-        throw new Error('Tabela tarefas_teste não encontrada.');
-    }
 };

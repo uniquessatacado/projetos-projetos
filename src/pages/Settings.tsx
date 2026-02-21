@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getSettings, saveSetting, getTemplates, getTarefasTeste } from "@/lib/api";
+import { getSettings, saveSetting, getTemplates } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,8 @@ import { useForm } from "react-hook-form";
 import { showSuccess, showError } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeployApiButton } from "@/components/DeployApiButton";
-import { CheckCircle2, XCircle, AlertCircle, Database } from "lucide-react";
+import { CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface SettingsForm {
   empresa_nome: string;
@@ -26,20 +27,12 @@ const Settings = () => {
     queryFn: getSettings,
   });
 
-  // Health Check da API
+  // Health Check: Tenta buscar templates para ver se a API nova está respondendo
   const { isError: isApiError, isLoading: isApiLoading, isSuccess: isApiSuccess, refetch: checkApi } = useQuery({
     queryKey: ['api-health-check'],
     queryFn: getTemplates,
     retry: false,
     refetchOnWindowFocus: false,
-  });
-
-  // Verificação da nova tabela (Migração)
-  const { data: tarefasTeste, isError: isMigrationError, refetch: checkMigration } = useQuery({
-    queryKey: ['migration-check'],
-    queryFn: getTarefasTeste,
-    retry: false,
-    enabled: isApiSuccess,
   });
 
   useEffect(() => {
@@ -76,7 +69,7 @@ const Settings = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <h1 className="text-3xl font-bold text-slate-800">Configurações</h1>
         <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => { checkApi(); checkMigration(); }} title="Verificar status novamente">
+            <Button variant="outline" size="sm" onClick={() => checkApi()} title="Verificar status novamente">
                 Verificar Status
             </Button>
             <DeployApiButton />
@@ -84,49 +77,38 @@ const Settings = () => {
       </div>
 
       <div className="grid gap-6 max-w-4xl">
-        {/* Card de Diagnóstico e Migração */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className={isApiSuccess ? "border-green-200 bg-green-50/50" : isApiError ? "border-red-200 bg-red-50/50" : ""}>
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        {isApiLoading ? (
-                            <span className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" />
-                        ) : isApiSuccess ? (
-                            <CheckCircle2 className="w-5 h-5 text-green-600" />
-                        ) : (
-                            <XCircle className="w-5 h-5 text-red-600" />
-                        )}
-                        Conexão com API
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {isApiLoading && <p className="text-sm text-gray-500">Verificando...</p>}
-                    {isApiSuccess && <p className="text-sm text-green-700 font-medium">Conectado com sucesso!</p>}
-                    {isApiError && (
-                        <div className="text-sm text-red-700">
-                            <p className="font-bold">Falha na conexão.</p>
-                            <p className="mt-1 opacity-80">Dica: Se estiver usando Chrome, clique no 🔒 da URL e permita "Conteúdo Inseguro".</p>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            <Card className={!isMigrationError && tarefasTeste ? "border-indigo-200 bg-indigo-50/50" : "border-slate-200"}>
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <Database className={`w-5 h-5 ${!isMigrationError && tarefasTeste ? "text-indigo-600" : "text-slate-400"}`} />
-                        Teste de Migração
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {!isMigrationError && tarefasTeste ? (
-                        <p className="text-sm text-indigo-700 font-medium">Tabela 'tarefas_teste' detectada!</p>
+        {/* Card de Diagnóstico */}
+        <Card className={isApiSuccess ? "border-green-200 bg-green-50/50" : isApiError ? "border-red-200 bg-red-50/50" : ""}>
+            <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                    {isApiLoading ? (
+                        <span className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" />
+                    ) : isApiSuccess ? (
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
                     ) : (
-                        <p className="text-sm text-slate-500">Tabela de teste não encontrada ou inacessível.</p>
+                        <XCircle className="w-5 h-5 text-red-600" />
                     )}
-                </CardContent>
-            </Card>
-        </div>
+                    Status do Sistema
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                {isApiLoading && <p className="text-sm text-gray-500">Verificando conexão com a API...</p>}
+                
+                {isApiSuccess && (
+                    <div className="text-sm text-green-700">
+                        <p className="font-medium">Sistema Operacional</p>
+                        <p>A API foi atualizada e as tabelas (Templates, Configurações) estão acessíveis.</p>
+                    </div>
+                )}
+
+                {isApiError && (
+                    <div className="text-sm text-red-700">
+                        <p className="font-medium mb-1">Atenção Necessária</p>
+                        <p>Não foi possível acessar as novas funcionalidades. Por favor, clique no botão <strong>"Atualizar API Remota"</strong> acima para corrigir.</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
       
         <Card>
             <CardHeader>
