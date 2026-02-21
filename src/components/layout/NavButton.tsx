@@ -1,5 +1,5 @@
 import { Home, PlusCircle, Settings } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 const icons = {
@@ -12,28 +12,23 @@ interface NavButtonProps {
   icon: keyof typeof icons;
   label: string;
   to: string;
-  isPrimary?: boolean;
 }
 
-const NavButton = ({ icon, label, to, isPrimary = false }: NavButtonProps) => {
+const NavButton = ({ icon, label, to }: NavButtonProps) => {
   const IconComponent = icons[icon];
+  const location = useLocation();
+  const isActive = location.pathname === to;
 
   return (
     <Link
       to={to}
       className={cn(
-        "flex flex-col items-center justify-center gap-1 text-gray-500 transition-colors",
-        isPrimary ? "text-primary-600" : "hover:text-primary-600"
+        "flex flex-col items-center justify-center gap-1 w-20 h-16 rounded-lg transition-colors",
+        isActive ? "text-primary-600 bg-primary-50" : "text-gray-500 hover:text-primary-600"
       )}
     >
-      {isPrimary ? (
-        <div className="p-3 bg-primary-600 text-white rounded-full -mt-8 shadow-glow">
-          <IconComponent className="w-7 h-7" />
-        </div>
-      ) : (
-        <IconComponent className="w-6 h-6" />
-      )}
-      <span className={cn("text-xs", isPrimary && "font-bold mt-1")}>{label}</span>
+      <IconComponent className="w-6 h-6" />
+      <span className="text-xs font-medium">{label}</span>
     </Link>
   );
 };
