@@ -1,16 +1,36 @@
 import { Project, Feature, PaginatedResponse } from "@/types";
 
-// Atualizado com o ID do projeto NocoDB
-const API_BASE_URL = "http://206.183.128.27:8082/api/v1/pw95ayzfy28vas3";
+// Nova URL base apontando para o script PHP
+const API_BASE_URL = "http://206.183.128.27/api.php";
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const url = new URL(API_BASE_URL);
+  
+  // Separa o caminho (path) e os parâmetros de consulta (query) do endpoint solicitado
+  // Exemplo: "/funcionalidades?where=(...)" vira path="funcionalidades" e query="where=(...)"
+  const [pathString, queryString] = endpoint.split('?');
+  
+  // Remove a barra inicial do path, se houver
+  const cleanPath = pathString.startsWith('/') ? pathString.substring(1) : pathString;
+  
+  // Define o parâmetro 'path' que o script PHP espera
+  url.searchParams.set('path', cleanPath);
+  
+  // Se existirem parâmetros de consulta originais (como filtros do NocoDB), adiciona-os à URL
+  if (queryString) {
+    const params = new URLSearchParams(queryString);
+    params.forEach((value, key) => {
+      url.searchParams.append(key, value);
+    });
+  }
+
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
   };
 
-  const response = await fetch(url, { ...options, headers });
+  // Faz a requisição para a URL construída (ex: .../api.php?path=projetos&where=...)
+  const response = await fetch(url.toString(), { ...options, headers });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ message: response.statusText }));
