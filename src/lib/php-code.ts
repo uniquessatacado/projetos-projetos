@@ -8,11 +8,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
 }
 
-// CONFIGURAÇÕES
-$host = 'localhost';
-$db   = 'gestor_escopos'; 
+// CONFIGURAÇÕES DO BANCO DE DADOS (MEMORIZADAS)
+$host = '172.22.0.2';
+$db   = 'projetos'; 
 $user = 'root';
-$pass = 'root'; 
+$pass = 'root123'; 
 
 function getPdo() {
     global $host, $db, $user, $pass;
@@ -27,6 +27,7 @@ function getPdo() {
         return $pdo;
     } catch (PDOException $e) {
         try {
+            // Tenta criar o banco caso não exista
             $pdo = new PDO("mysql:host=$host;charset=utf8", $user, $pass);
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $pdo->exec("CREATE DATABASE IF NOT EXISTS \`$db\`");
@@ -82,7 +83,7 @@ function initTables($pdo) {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )");
 
-    // NOVA TABELA: Tarefas
+    // Tarefas
     $pdo->exec("CREATE TABLE IF NOT EXISTS tarefas (
         id INT AUTO_INCREMENT PRIMARY KEY,
         titulo VARCHAR(255) NOT NULL,
@@ -140,6 +141,34 @@ switch ($resource) {
             $stmt = $pdo->prepare("INSERT INTO tarefas (titulo) VALUES (?)");
             $stmt->execute([$input['titulo']]);
             echo json_encode(['id' => $pdo->lastInsertId()]);
+        }
+        break;
+
+    case 'templates':
+        $pdo = getPdo();
+        if ($method === 'GET') {
+            $stmt = $pdo->query("SELECT * FROM templates ORDER BY id DESC");
+            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+        } elseif ($method === 'POST') {
+            $stmt = $pdo->prepare("INSERT INTO templates (nome, descricao) VALUES (?, ?)");
+            $stmt->execute([$input['nome'], $input['descricao'] ?? '']);
+            echo json_encode(['id' => $pdo->lastInsertId()]);
+        } elseif ($method === 'DELETE' && $id) {
+            $stmt = $pdo->prepare("DELETE FROM templates WHERE id = ?");
+            $stmt->execute([$id]);
+            http_response_code(204);
+        }
+        break;
+
+    case 'configuracoes':
+        $pdo = getPdo();
+        if ($method === 'GET') {
+            $stmt = $pdo->query("SELECT * FROM configuracoes");
+            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+        } elseif ($method === 'POST') {
+            $stmt = $pdo->prepare("INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)");
+            $stmt->execute([$input['chave'], $input['valor']]);
+            echo json_encode(['success' => true]);
         }
         break;
 
