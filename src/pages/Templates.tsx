@@ -6,10 +6,11 @@ import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/comp
 import { Button } from "@/components/ui/button";
 import { Trash2, FileCode } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
+import { Template } from "@/types";
 
 const Templates = () => {
   const queryClient = useQueryClient();
-  const { data: templates, isLoading, isError } = useQuery({
+  const { data: templates, isLoading, isError } = useQuery<Template[]>({
     queryKey: ['templates'],
     queryFn: getTemplates,
   });

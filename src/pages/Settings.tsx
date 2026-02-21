@@ -9,8 +9,8 @@ import { useForm } from "react-hook-form";
 import { showSuccess, showError } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeployApiButton } from "@/components/DeployApiButton";
-import { CheckCircle2, XCircle, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CheckCircle2, XCircle } from "lucide-react";
+import { Setting } from "@/types";
 
 interface SettingsForm {
   empresa_nome: string;
@@ -22,12 +22,11 @@ const Settings = () => {
   const queryClient = useQueryClient();
   const { register, handleSubmit, setValue } = useForm<SettingsForm>();
 
-  const { data: settings, isLoading } = useQuery({
+  const { data: settings, isLoading } = useQuery<Setting[]>({
     queryKey: ['settings'],
     queryFn: getSettings,
   });
 
-  // Health Check: Tenta buscar templates para ver se a API nova está respondendo
   const { isError: isApiError, isLoading: isApiLoading, isSuccess: isApiSuccess, refetch: checkApi } = useQuery({
     queryKey: ['api-health-check'],
     queryFn: getTemplates,
@@ -77,7 +76,6 @@ const Settings = () => {
       </div>
 
       <div className="grid gap-6 max-w-4xl">
-        {/* Card de Diagnóstico */}
         <Card className={isApiSuccess ? "border-green-200 bg-green-50/50" : isApiError ? "border-red-200 bg-red-50/50" : ""}>
             <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">

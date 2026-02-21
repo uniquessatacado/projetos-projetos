@@ -1,29 +1,19 @@
-import { Project, Feature, PaginatedResponse } from "@/types";
+import { Project, Feature, PaginatedResponse, Template, Setting } from "@/types";
 
-// URL atualizada com a porta 3001
 const API_BASE_URL = "http://206.183.128.27:3001/api.php";
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = new URL(API_BASE_URL);
-  
-  // Lógica para converter /recurso?param=valor em ?path=recurso&param=valor
   const [pathString, queryString] = endpoint.split('?');
   const cleanPath = pathString.startsWith('/') ? pathString.substring(1) : pathString;
-  
   url.searchParams.set('path', cleanPath);
   
   if (queryString) {
     const params = new URLSearchParams(queryString);
-    params.forEach((value, key) => {
-      url.searchParams.append(key, value);
-    });
+    params.forEach((value, key) => url.searchParams.append(key, value));
   }
 
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
-
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
   const response = await fetch(url.toString(), { ...options, headers });
 
   if (!response.ok) {
@@ -31,22 +21,15 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     throw new Error(errorData.message || 'Ocorreu um erro na requisição.');
   }
   
-  if (response.status === 204) {
-    return null as T;
-  }
-
+  if (response.status === 204) return null as T;
   return response.json();
 }
 
-// Helper para tratar respostas que podem ser array direto ou objeto paginado { list: [] }
 function extractList<T>(response: PaginatedResponse<T> | T[]): T[] {
-  if (Array.isArray(response)) {
-    return response;
-  }
+  if (Array.isArray(response)) return response;
   return response.list || [];
 }
 
-// Project Endpoints
 export const getProjects = async (): Promise<Project[]> => {
   const response = await request<PaginatedResponse<Project> | Project[]>('/projetos');
   return extractList(response);
@@ -54,73 +37,23 @@ export const getProjects = async (): Promise<Project[]> => {
 
 export const getProjectById = (id: string): Promise<Project> => request(`/projetos/${id}`);
 
-export const createProject = (data: { nome: string; cliente_nome: string; descricao?: string }): Promise<Project> => {
-  return request('/projetos', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-};
+export const createProject = (data: any): Promise<Project> => request('/projetos', { method: 'POST', body: JSON.stringify(data) });
 
-// Feature Endpoints
+export const updateProject = (id: number, data: Partial<Project>): Promise<void> => request(`/projetos/${id}`, { method: 'POST', body: JSON.stringify(data) });
+
 export const getFeaturesByProjectId = async (projectId: number): Promise<Feature[]> => {
   const response = await request<PaginatedResponse<Feature> | Feature[]>(`/funcionalidades?projeto_id=${projectId}`);
   return extractList(response);
 };
 
-export const createFeature = (data: Omit<Feature, 'id'>): Promise<Feature> => {
-    return request('/funcionalidades', {
-        method: 'POST',
-        body: JSON.stringify(data),
-    });
-};
+export const createFeature = (data: any): Promise<Feature> => request('/funcionalidades', { method: 'POST', body: JSON.stringify(data) });
 
-export const deleteFeature = (id: number): Promise<void> => {
-    return request(`/funcionalidades/${id}`, {
-        method: 'DELETE',
-    });
-};
+export const updateFeature = (id: number, data: Partial<Feature>): Promise<void> => request(`/funcionalidades/${id}`, { method: 'POST', body: JSON.stringify(data) });
 
-// Templates Endpoints
-export interface Template {
-  id: number;
-  nome: string;
-  descricao: string;
-  created_at: string;
-}
+export const deleteFeature = (id: number): Promise<void> => request(`/funcionalidades/${id}`, { method: 'DELETE' });
 
-export const getTemplates = async (): Promise<Template[]> => {
-  const response = await request<PaginatedResponse<Template> | Template[]>('/templates');
-  return extractList(response);
-};
-
-export const createTemplate = (data: { nome: string; descricao: string }): Promise<Template> => {
-  return request('/templates', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-};
-
-export const deleteTemplate = (id: number): Promise<void> => {
-  return request(`/templates/${id}`, {
-    method: 'DELETE',
-  });
-};
-
-// Settings Endpoints
-export interface Setting {
-  id: number;
-  chave: string;
-  valor: string;
-}
-
-export const getSettings = async (): Promise<Setting[]> => {
-  const response = await request<PaginatedResponse<Setting> | Setting[]>('/configuracoes');
-  return extractList(response);
-};
-
-export const saveSetting = (data: { chave: string; valor: string }): Promise<Setting> => {
-  return request('/configuracoes', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-};
+export const getTemplates = async (): Promise<Template[]> => extractList(await request<any>('/templates'));
+export const createTemplate = (data: any): Promise<Template> => request('/templates', { method: 'POST', body: JSON.stringify(data) });
+export const deleteTemplate = (id: number): Promise<void> => request(`/templates/${id}`, { method: 'DELETE' });
+export const getSettings = async (): Promise<Setting[]> => extractList(await request<any>('/configuracoes'));
+export const saveSetting = (data: any): Promise<void> => request('/configuracoes', { method: 'POST', body: JSON.stringify(data) });

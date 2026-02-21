@@ -1,7 +1,7 @@
 export const PHP_API_CODE = `<?php
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Headers: Content-Type");
-header("Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS");
+header("Access-Control-Allow-Methods: GET, POST, DELETE, PUT, OPTIONS");
 header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -38,31 +38,33 @@ function getPdo() {
 }
 
 function initTables($pdo) {
-    // Projetos - Usando VARCHAR(50) para status conforme regra
+    // Projetos - Atualizado com controle de tempo e workflow
     $pdo->exec("CREATE TABLE IF NOT EXISTS projetos (
         id INT AUTO_INCREMENT PRIMARY KEY,
         nome VARCHAR(255) NOT NULL,
         cliente_nome VARCHAR(255) NOT NULL,
         descricao TEXT,
-        status VARCHAR(50) DEFAULT 'rascunho',
-        prazo_estimado_dias INT DEFAULT 0,
+        status VARCHAR(50) DEFAULT 'aguardando_inicio',
+        prazo_entrega DATE,
+        started_at TIMESTAMP NULL,
+        finished_at TIMESTAMP NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB");
 
-    // Funcionalidades - Usando VARCHAR(50) para complexidade conforme regra
+    // Funcionalidades - Atualizado com status de progresso e observações
     $pdo->exec("CREATE TABLE IF NOT EXISTS funcionalidades (
         id INT AUTO_INCREMENT PRIMARY KEY,
         projeto_id INT NOT NULL,
         titulo VARCHAR(255) NOT NULL,
         descricao TEXT,
+        observacoes TEXT,
+        status VARCHAR(50) DEFAULT 'pendente',
         complexidade VARCHAR(50) NOT NULL,
-        categoria VARCHAR(100),
-        tempo_estimado_horas INT DEFAULT 0,
+        data_programada DATE,
         ordem INT DEFAULT 0,
         FOREIGN KEY (projeto_id) REFERENCES projetos(id) ON DELETE CASCADE
     ) ENGINE=InnoDB");
 
-    // Templates
     $pdo->exec("CREATE TABLE IF NOT EXISTS templates (
         id INT AUTO_INCREMENT PRIMARY KEY,
         nome VARCHAR(255) NOT NULL,
@@ -70,20 +72,11 @@ function initTables($pdo) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB");
 
-    // Configurações
     $pdo->exec("CREATE TABLE IF NOT EXISTS configuracoes (
         id INT AUTO_INCREMENT PRIMARY KEY,
         chave VARCHAR(50) UNIQUE NOT NULL,
         valor TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB");
-
-    // Tarefas
-    $pdo->exec("CREATE TABLE IF NOT EXISTS tarefas (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        titulo VARCHAR(255) NOT NULL,
-        concluida TINYINT(1) DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB");
 }
 
@@ -109,37 +102,52 @@ try {
                     echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
                 }
             } elseif ($method === 'POST') {
-                $stmt = $pdo->prepare("INSERT INTO projetos (nome, cliente_nome, descricao, status) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$input['nome'], $input['cliente_nome'], $input['descricao'] ?? '', $input['status'] ?? 'rascunho']);
-                echo json_encode(['id' => $pdo->lastInsertId()]);
+                if ($id) { // UPDATE
+                    $fields = [];
+                    $params = [];
+                    foreach($input as $key => $val) {
+                        $fields[] = "$key = ?";
+                        $params[] = $val;
+                    }
+                    $params[] = $id;
+                    $stmt = $pdo->prepare("UPDATE projetos SET " . implode(', ', $fields) . " WHERE id = ?");
+                    $stmt->execute($params);
+                    echo json_encode(['success' => true]);
+                } else { // CREATE
+                    $stmt = $pdo->prepare("INSERT INTO projetos (nome, cliente_nome, descricao, prazo_entrega) VALUES (?, ?, ?, ?)");
+                    $stmt->execute([$input['nome'], $input['cliente_nome'], $input['descricao'] ?? '', $input['prazo_entrega'] ?? null]);
+                    echo json_encode(['id' => $pdo->lastInsertId()]);
+                }
             }
             break;
 
         case 'funcionalidades':
             if ($method === 'GET') {
                 $projeto_id = $_GET['projeto_id'] ?? null;
-                $stmt = $pdo->prepare("SELECT * FROM funcionalidades WHERE projeto_id = ? ORDER BY id ASC");
+                $stmt = $pdo->prepare("SELECT * FROM funcionalidades WHERE projeto_id = ? ORDER BY ordem ASC, id ASC");
                 $stmt->execute([$projeto_id]);
                 echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
             } elseif ($method === 'POST') {
-                $stmt = $pdo->prepare("INSERT INTO funcionalidades (projeto_id, titulo, complexidade, descricao) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$input['projeto_id'], $input['titulo'], $input['complexidade'], $input['descricao'] ?? '']);
-                echo json_encode(['id' => $pdo->lastInsertId()]);
+                if ($id) { // UPDATE
+                    $fields = [];
+                    $params = [];
+                    foreach($input as $key => $val) {
+                        $fields[] = "$key = ?";
+                        $params[] = $val;
+                    }
+                    $params[] = $id;
+                    $stmt = $pdo->prepare("UPDATE funcionalidades SET " . implode(', ', $fields) . " WHERE id = ?");
+                    $stmt->execute($params);
+                    echo json_encode(['success' => true]);
+                } else { // CREATE
+                    $stmt = $pdo->prepare("INSERT INTO funcionalidades (projeto_id, titulo, complexidade, descricao, ordem) VALUES (?, ?, ?, ?, ?)");
+                    $stmt->execute([$input['projeto_id'], $input['titulo'], $input['complexidade'], $input['descricao'] ?? '', $input['ordem'] ?? 0]);
+                    echo json_encode(['id' => $pdo->lastInsertId()]);
+                }
             } elseif ($method === 'DELETE' && $id) {
                 $stmt = $pdo->prepare("DELETE FROM funcionalidades WHERE id = ?");
                 $stmt->execute([$id]);
                 http_response_code(204);
-            }
-            break;
-
-        case 'tarefas':
-            if ($method === 'GET') {
-                $stmt = $pdo->query("SELECT * FROM tarefas ORDER BY id DESC");
-                echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-            } elseif ($method === 'POST') {
-                $stmt = $pdo->prepare("INSERT INTO tarefas (titulo) VALUES (?)");
-                $stmt->execute([$input['titulo']]);
-                echo json_encode(['id' => $pdo->lastInsertId()]);
             }
             break;
 
