@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -9,14 +11,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { PlusCircle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PlusCircle, CircleDollarSign, UserPlus } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { Project } from '@/types';
+import { stringifyMetadata } from '@/lib/meta-utils';
 
 const projectSchema = z.object({
   nome: z.string().min(3, { message: 'O nome do projeto é obrigatório.' }),
   cliente_nome: z.string().min(3, { message: 'O nome do cliente é obrigatório.' }),
   descricao: z.string().optional(),
+  valor_fechado: z.string().optional(),
+  forma_pagamento: z.string().optional(),
+  indicacao: z.string().optional(),
+  comissao_valor: z.string().optional(),
 });
 
 type ProjectFormData = z.infer<typeof projectSchema>;
@@ -25,68 +33,117 @@ export const NewProjectDialog = () => {
   const [isOpen, setIsOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ProjectFormData>({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
+    defaultValues: {
+      forma_pagamento: 'a_vista'
+    }
   });
 
   const mutation = useMutation<Project, Error, ProjectFormData>({
-    mutationFn: createProject,
+    mutationFn: (data) => {
+      const metadata = {
+        valor_fechado: data.valor_fechado,
+        forma_pagamento: data.forma_pagamento,
+        indicacao: data.indicacao,
+        comissao_valor: data.comissao_valor,
+        status: 'aguardando_inicio'
+      };
+      
+      const fullDescription = stringifyMetadata(data.descricao || '', metadata);
+      
+      return createProject({
+        nome: data.nome,
+        cliente_nome: data.cliente_nome,
+        descricao: fullDescription
+      });
+    },
     onSuccess: () => {
-      showSuccess('Projeto criado com sucesso!');
+      showSuccess('Projeto comercial criado!');
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       setIsOpen(false);
       reset();
     },
-    onError: (error) => {
-      showError(error.message);
-    },
+    onError: (error) => showError(error.message),
   });
 
-  const onSubmit = (data: ProjectFormData) => {
-    mutation.mutate(data);
-  };
+  const onSubmit = (data: ProjectFormData) => mutation.mutate(data);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-primary-600 hover:bg-primary-700">
+        <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-glow font-bold">
           <PlusCircle className="w-5 h-5 mr-2" />
           Novo Projeto
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Criar Novo Projeto</DialogTitle>
+          <DialogTitle>Novo Escopo Comercial</DialogTitle>
           <DialogDescription>
-            Preencha as informações abaixo para iniciar um novo escopo.
+            Registre o projeto e os detalhes da negociação.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="nome" className="text-right">
-                Projeto
-              </Label>
-              <Input id="nome" {...register('nome')} className="col-span-3" />
-              {errors.nome && <p className="col-span-4 text-red-500 text-sm text-right">{errors.nome.message}</p>}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="nome">Nome do Projeto</Label>
+              <Input id="nome" {...register('nome')} placeholder="Ex: E-commerce Peramix" />
+              {errors.nome && <p className="text-red-500 text-xs">{errors.nome.message}</p>}
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="cliente_nome" className="text-right">
-                Cliente
-              </Label>
-              <Input id="cliente_nome" {...register('cliente_nome')} className="col-span-3" />
-              {errors.cliente_nome && <p className="col-span-4 text-red-500 text-sm text-right">{errors.cliente_nome.message}</p>}
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="descricao" className="text-right">
-                Descrição
-              </Label>
-              <Textarea id="descricao" {...register('descricao')} className="col-span-3" />
+            <div className="space-y-2">
+              <Label htmlFor="cliente_nome">Cliente</Label>
+              <Input id="cliente_nome" {...register('cliente_nome')} placeholder="Empresa ou Pessoa" />
+              {errors.cliente_nome && <p className="text-red-500 text-xs">{errors.cliente_nome.message}</p>}
             </div>
           </div>
+
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-4">
+            <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm mb-2">
+              <CircleDollarSign className="w-4 h-4" /> Detalhes Financeiros
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Valor Fechado (R$)</Label>
+                <Input type="number" step="0.01" {...register('valor_fechado')} placeholder="0,00" />
+              </div>
+              <div className="space-y-2">
+                <Label>Forma de Pagamento</Label>
+                <Select onValueChange={(v) => setValue('forma_pagamento', v)} defaultValue="a_vista">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="a_vista">À Vista</SelectItem>
+                    <SelectItem value="parcelado">Parcelado</SelectItem>
+                    <SelectItem value="50_entrada_50_entrega">50% Entrada / 50% Entrega</SelectItem>
+                    <SelectItem value="recorrente">Mensalidade/Recorrente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1"><UserPlus className="w-3 h-3" /> Indicação / Parceiro</Label>
+                <Input {...register('indicacao')} placeholder="Nome de quem indicou" />
+              </div>
+              <div className="space-y-2">
+                <Label>Comissão (R$)</Label>
+                <Input type="number" step="0.01" {...register('comissao_valor')} placeholder="Valor da comissão" />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="descricao">Descrição Técnica / Notas</Label>
+            <Textarea id="descricao" {...register('descricao')} className="min-h-[80px]" />
+          </div>
+
           <DialogFooter>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Criando...' : 'Criar Projeto'}
+            <Button type="submit" className="w-full md:w-auto bg-indigo-600" disabled={mutation.isPending}>
+              {mutation.isPending ? 'Salvando...' : 'Criar Projeto'}
             </Button>
           </DialogFooter>
         </form>

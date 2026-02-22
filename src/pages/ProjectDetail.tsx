@@ -1,3 +1,5 @@
+"use client";
+
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getProjectById, getFeaturesByProjectId, updateProject, updateFeature, deleteFeature } from '@/lib/api';
@@ -13,6 +15,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { NewFeatureDialog } from '@/components/project/NewFeatureDialog';
 import { WorkflowGuide } from '@/components/project/WorkflowGuide';
+import { FinancialInfoCard } from '@/components/project/FinancialInfoCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { parseMetadata, stringifyMetadata, getCleanDescription } from '@/lib/meta-utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -216,6 +219,7 @@ const ProjectDetail = () => {
         </div>
 
         <aside className="space-y-6">
+            <FinancialInfoCard descricao={project?.descricao} />
             <Card className="bg-indigo-600 text-white border-none shadow-glow overflow-hidden relative">
                 <div className="absolute top-0 right-0 p-4 opacity-10">
                     <Clock className="w-24 h-24" />
@@ -230,11 +234,6 @@ const ProjectDetail = () => {
                         {projectMeta.started_at && (
                             <div className="flex items-center gap-2 text-xs font-bold bg-white/10 p-2 rounded-lg">
                                 <Clock className="w-4 h-4" /> Ativo há {getElapsedTime(projectMeta.started_at)}
-                            </div>
-                        )}
-                        {projectMeta.paused_at && currentProjectStatus === 'pausado' && (
-                            <div className="flex items-center gap-2 text-xs font-bold bg-amber-500/30 p-2 rounded-lg">
-                                <Pause className="w-4 h-4" /> Pausado há {getElapsedTime(projectMeta.paused_at)}
                             </div>
                         )}
                     </div>
