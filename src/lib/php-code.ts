@@ -1,10 +1,19 @@
 export const PHP_API_CODE = `<?php
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Access-Control-Allow-Methods: GET, POST, DELETE, PUT, OPTIONS");
 header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
+
+if (!extension_loaded('pdo_mysql')) {
+    http_response_code(500);
+    echo json_encode(['error' => 'A extensao PDO MySQL nao esta instalada ou habilitada no PHP.']);
+    exit;
+}
 
 $host = '172.22.0.2';
 $db   = 'projetos'; 
@@ -42,6 +51,13 @@ try {
         descricao LONGTEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB");
+    
+    $pdo->exec("CREATE TABLE IF NOT EXISTS knowledge_base (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        descricao LONGTEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS configuracoes (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -52,7 +68,7 @@ try {
 
 } catch (PDOException $e) {
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode(['error' => 'Erro de Banco de Dados: ' . $e->getMessage()]);
     exit;
 }
 
@@ -125,6 +141,22 @@ try {
                 echo json_encode(['success' => true]);
             }
             break;
+            
+        case 'knowledge_base':
+            if ($method === 'GET') {
+                echo json_encode($pdo->query("SELECT * FROM knowledge_base ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC));
+            } elseif ($method === 'POST') {
+                if ($id) {
+                    $pdo->prepare("UPDATE knowledge_base SET nome = ?, descricao = ? WHERE id = ?")->execute([$input['nome'], $input['descricao'] ?? '', $id]);
+                } else {
+                    $pdo->prepare("INSERT INTO knowledge_base (nome, descricao) VALUES (?, ?)")->execute([$input['nome'], $input['descricao'] ?? '']);
+                }
+                echo json_encode(['success' => true]);
+            } elseif ($method === 'DELETE' && $id) {
+                $pdo->prepare("DELETE FROM knowledge_base WHERE id = ?")->execute([$id]);
+                echo json_encode(['success' => true]);
+            }
+            break;
 
         case 'configuracoes':
             if ($method === 'GET') {
@@ -135,9 +167,14 @@ try {
                 echo json_encode(['success' => true]);
             }
             break;
+        
+        default:
+            http_response_code(404);
+            echo json_encode(['error' => "Endpoint nao encontrado: " . htmlspecialchars($res)]);
+            break;
     }
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode(['error' => 'Erro Interno no Servidor: ' . $e->getMessage()]);
 }
 ?>`;
