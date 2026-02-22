@@ -1,4 +1,4 @@
-import { Home, Settings, FolderKanban, Users } from 'lucide-react';
+import { Home, Settings, FolderKanban, Users, Lightbulb } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -13,9 +13,9 @@ const SidebarContent = () => {
 
   return (
     <div className="flex flex-col h-full p-4">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-primary-600">GEP</h1>
-        <p className="text-sm text-gray-500">Gestor de Escopos</p>
+      <div className="mb-8 px-4">
+        <h1 className="text-2xl font-black text-primary-600 tracking-tighter">GEP 2.0</h1>
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Gestor de Escopos</p>
       </div>
       <nav className="flex flex-col space-y-2">
         <NavLink to="/" end className={linkClasses}>
@@ -24,7 +24,11 @@ const SidebarContent = () => {
         </NavLink>
         <NavLink to="/clientes" className={linkClasses}>
           <Users className="w-5 h-5" />
-          <span>Clientes</span>
+          <span>Central de Clientes</span>
+        </NavLink>
+        <NavLink to="/conhecimento" className={linkClasses}>
+          <Lightbulb className="w-5 h-5" />
+          <span>Prompts & Tutoriais</span>
         </NavLink>
         <NavLink to="/templates" className={linkClasses}>
           <FolderKanban className="w-5 h-5" />
@@ -35,8 +39,8 @@ const SidebarContent = () => {
           <span>Configurações</span>
         </NavLink>
       </nav>
-      <div className="mt-auto">
-        <p className="text-xs text-gray-400">Versão 2.2.0</p>
+      <div className="mt-auto p-4 border-t border-gray-100">
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Dyad System</p>
       </div>
     </div>
   );

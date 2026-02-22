@@ -9,6 +9,7 @@ import ProjectDetail from "./pages/ProjectDetail";
 import Templates from "./pages/Templates";
 import Settings from "./pages/Settings";
 import Clients from "./pages/Clients";
+import KnowledgeBase from "./pages/KnowledgeBase";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
             <Route path="/" element={<Dashboard />} />
             <Route path="/projetos/:id" element={<ProjectDetail />} />
             <Route path="/clientes" element={<Clients />} />
+            <Route path="/conhecimento" element={<KnowledgeBase />} />
             <Route path="/templates" element={<Templates />} />
             <Route path="/configuracoes" element={<Settings />} />
           </Route>
