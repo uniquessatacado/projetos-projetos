@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { showError, showSuccess } from '@/utils/toast';
 import { Project } from '@/types';
 import { parseMetadata, getCleanDescription, stringifyMetadata } from '@/lib/meta-utils';
-import { CircleDollarSign, UserPlus, HardDrive, Globe } from 'lucide-react';
+import { CircleDollarSign, UserPlus, HardDrive, Rocket } from 'lucide-react';
 
 const projectSchema = z.object({
   nome: z.string().min(3),
@@ -33,6 +33,8 @@ const projectSchema = z.object({
   has_server: z.string().optional(),
   vps_plan: z.string().optional(),
   has_domain: z.string().optional(),
+  modelo_negocio: z.string().optional(),
+  valor_assinatura: z.string().optional(),
 });
 
 type ProjectFormData = z.infer<typeof projectSchema>;
@@ -53,6 +55,7 @@ export const EditProjectDialog = ({ project, open, onOpenChange }: EditProjectDi
 
   const formaPagamento = watch('forma_pagamento');
   const hasServer = watch('has_server');
+  const modeloNegocio = watch('modelo_negocio');
 
   useEffect(() => {
     if (open) {
@@ -72,27 +75,19 @@ export const EditProjectDialog = ({ project, open, onOpenChange }: EditProjectDi
         has_server: meta.has_server || '',
         vps_plan: meta.vps_plan || '',
         has_domain: meta.has_domain || '',
+        modelo_negocio: meta.modelo_negocio || 'exclusivo',
+        valor_assinatura: meta.valor_assinatura || '',
       });
     }
   }, [open, project, reset]);
 
   const mutation = useMutation({
     mutationFn: (data: ProjectFormData) => {
-      const updatedMeta = { 
-        ...meta, 
-        ...data,
-      };
-      // A descrição limpa não vai para o JSON, ela é a base do texto
+      const updatedMeta = { ...meta, ...data };
       const cleanDesc = data.descricao_limpa || '';
       const { descricao_limpa, ...metaWithoutDesc } = updatedMeta;
-      
       const updatedDesc = stringifyMetadata(cleanDesc, metaWithoutDesc);
-      
-      return updateProject(project.id, { 
-        nome: data.nome, 
-        cliente_nome: data.cliente_nome, 
-        descricao: updatedDesc 
-      });
+      return updateProject(project.id, { nome: data.nome, cliente_nome: data.cliente_nome, descricao: updatedDesc });
     },
     onSuccess: () => {
       showSuccess('Dados atualizados!');
@@ -106,67 +101,63 @@ export const EditProjectDialog = ({ project, open, onOpenChange }: EditProjectDi
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Editar Negociação</DialogTitle>
-          <DialogDescription>Atualize os valores e a inteligência de comissão.</DialogDescription>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Editar Negociação</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-5">
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1"><Label>Projeto</Label><Input {...register('nome')} /></div>
                 <div className="space-y-1"><Label>Cliente</Label><Input {...register('cliente_nome')} /></div>
             </div>
 
+            <div className="p-4 bg-indigo-50/50 rounded-xl space-y-4">
+                <Label className="flex items-center gap-2 font-bold"><Rocket className="w-4 h-4 text-indigo-600" /> Modelo de Entrega</Label>
+                <div className="grid grid-cols-2 gap-4">
+                    <Select onValueChange={(v) => setValue('modelo_negocio', v)} defaultValue={meta.modelo_negocio || 'exclusivo'}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="exclusivo">Sistema Exclusivo</SelectItem>
+                            <SelectItem value="assinatura">Assinatura / SaaS</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    {modeloNegocio === 'assinatura' && (
+                        <Input type="number" step="0.01" {...register('valor_assinatura')} placeholder="Valor Mensal" />
+                    )}
+                </div>
+            </div>
+
             <div className="p-4 bg-slate-50 rounded-xl space-y-4">
-                <Label className="flex items-center gap-2"><HardDrive className="w-4 h-4 text-indigo-500" /> Infraestrutura</Label>
+                <Label className="flex items-center gap-2 font-bold"><HardDrive className="w-4 h-4 text-slate-500" /> Infraestrutura</Label>
                 <div className="grid grid-cols-2 gap-4">
                     <Select onValueChange={(v) => setValue('has_server', v)} defaultValue={meta.has_server}>
                         <SelectTrigger><SelectValue placeholder="Terá Servidor?" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="yes">Sim, precisa de VPS</SelectItem>
-                            <SelectItem value="no">Não (Cliente já tem / Outro)</SelectItem>
-                        </SelectContent>
+                        <SelectContent><SelectItem value="yes">Sim</SelectItem><SelectItem value="no">Não</SelectItem></SelectContent>
                     </Select>
                     {hasServer === 'yes' && (
                         <Select onValueChange={(v) => setValue('vps_plan', v)} defaultValue={meta.vps_plan}>
                             <SelectTrigger><SelectValue placeholder="Escolha o Plano" /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="basic">$3.49 (4 vCPU / 8GB)</SelectItem>
-                                <SelectItem value="popular">$6.49 (6 vCPU / 12GB)</SelectItem>
-                                <SelectItem value="pro">$10.49 (8 vCPU / 24GB)</SelectItem>
-                                <SelectItem value="elite">$17.49 (10 vCPU / 32GB)</SelectItem>
-                                <SelectItem value="maximum">$27.49 (16 vCPU / 64GB)</SelectItem>
+                                <SelectItem value="basic">$3.49</SelectItem><SelectItem value="popular">$6.49</SelectItem>
+                                <SelectItem value="pro">$10.49</SelectItem><SelectItem value="elite">$17.49</SelectItem>
+                                <SelectItem value="maximum">$27.49</SelectItem>
                             </SelectContent>
                         </Select>
                     )}
                 </div>
-                <div className="grid grid-cols-1 gap-4">
-                    <Select onValueChange={(v) => setValue('has_domain', v)} defaultValue={meta.has_domain}>
-                        <SelectTrigger><SelectValue placeholder="Terá Domínio?" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="yes">Sim (+ R$ 60,00/ano)</SelectItem>
-                            <SelectItem value="no">Não (Já possui)</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
             </div>
 
             <div className="p-4 bg-slate-50 rounded-xl space-y-4">
-                <Label className="flex items-center gap-2"><CircleDollarSign className="w-4 h-4" /> Pagamento</Label>
+                <Label className="flex items-center gap-2 font-bold"><CircleDollarSign className="w-4 h-4 text-slate-500" /> Setup / Pagamento</Label>
                 <div className="grid grid-cols-3 gap-4">
-                    <Input type="number" step="0.01" {...register('valor_fechado')} placeholder="Total" />
+                    <Input type="number" step="0.01" {...register('valor_fechado')} placeholder="Setup" />
                     <Select onValueChange={(v) => setValue('forma_pagamento', v)} defaultValue={meta.forma_pagamento || 'a_vista'}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="a_vista">À Vista</SelectItem>
-                            <SelectItem value="parcelado">Parcelado</SelectItem>
-                        </SelectContent>
+                        <SelectContent><SelectItem value="a_vista">À Vista</SelectItem><SelectItem value="parcelado">Parcelado</SelectItem></SelectContent>
                     </Select>
                     {formaPagamento === 'parcelado' && <Input type="number" {...register('projeto_parcelas')} />}
                 </div>
             </div>
 
             <div className="p-4 bg-amber-50 rounded-xl space-y-4">
-                <Label className="flex items-center gap-2"><UserPlus className="w-4 h-4" /> Comissão Parceiro</Label>
+                <Label className="flex items-center gap-2 font-bold"><UserPlus className="w-4 h-4 text-amber-600" /> Comissão Parceiro</Label>
                 <div className="grid grid-cols-2 gap-4">
                     <Input {...register('indicacao_nome')} placeholder="Nome Parceiro" />
                     <Input {...register('indicacao_whatsapp')} placeholder="WhatsApp" />
@@ -174,18 +165,12 @@ export const EditProjectDialog = ({ project, open, onOpenChange }: EditProjectDi
                 <div className="grid grid-cols-3 gap-4">
                     <Select onValueChange={(v:any) => setValue('comissao_tipo', v)} defaultValue={meta.comissao_tipo || 'fixo'}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="fixo">Fixo</SelectItem>
-                            <SelectItem value="porcentagem">%</SelectItem>
-                        </SelectContent>
+                        <SelectContent><SelectItem value="fixo">Fixo</SelectItem><SelectItem value="porcentagem">%</SelectItem></SelectContent>
                     </Select>
                     <Input type="number" step="0.01" {...register('comissao_valor_base')} />
                     <Select onValueChange={(v:any) => setValue('comissao_pagamento', v)} defaultValue={meta.comissao_pagamento || 'unico'}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="unico">Integral</SelectItem>
-                            <SelectItem value="proporcional">Proporcional</SelectItem>
-                        </SelectContent>
+                        <SelectContent><SelectItem value="unico">Integral</SelectItem><SelectItem value="proporcional">Proporcional</SelectItem></SelectContent>
                     </Select>
                 </div>
             </div>

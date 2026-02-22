@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, CircleDollarSign, UserPlus, Phone } from 'lucide-react';
+import { PlusCircle, CircleDollarSign, UserPlus, Repeat, Rocket } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { Project } from '@/types';
 import { stringifyMetadata, parseMetadata } from '@/lib/meta-utils';
@@ -31,6 +31,8 @@ const projectSchema = z.object({
   comissao_tipo: z.enum(['fixo', 'porcentagem']).default('fixo'),
   comissao_valor_base: z.string().optional(),
   comissao_pagamento: z.enum(['unico', 'proporcional']).default('unico'),
+  modelo_negocio: z.enum(['exclusivo', 'assinatura']).default('exclusivo'),
+  valor_assinatura: z.string().optional(),
 });
 
 type ProjectFormData = z.infer<typeof projectSchema>;
@@ -44,23 +46,16 @@ export const NewProjectDialog = () => {
     queryFn: getProjects,
   });
 
-  // Extrair lista única de clientes e parceiros para o autocomplete
   const { clientsList, partnersList } = useMemo(() => {
     if (!projects) return { clientsList: [], partnersList: [] };
-    
     const clients = new Map();
     const partners = new Map();
-
     projects.forEach(p => {
       const meta = parseMetadata<any>(p.descricao);
       if (p.cliente_nome) clients.set(p.cliente_nome, { value: p.cliente_nome, label: p.cliente_nome, whatsapp: meta.cliente_whatsapp });
       if (meta.indicacao_nome) partners.set(meta.indicacao_nome, { value: meta.indicacao_nome, label: meta.indicacao_nome, whatsapp: meta.indicacao_whatsapp });
     });
-
-    return { 
-      clientsList: Array.from(clients.values()), 
-      partnersList: Array.from(partners.values()) 
-    };
+    return { clientsList: Array.from(clients.values()), partnersList: Array.from(partners.values()) };
   }, [projects]);
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ProjectFormData>({
@@ -69,10 +64,12 @@ export const NewProjectDialog = () => {
       forma_pagamento: 'a_vista',
       projeto_parcelas: '1',
       comissao_tipo: 'fixo',
-      comissao_pagamento: 'unico'
+      comissao_pagamento: 'unico',
+      modelo_negocio: 'exclusivo'
     }
   });
 
+  const modeloNegocio = watch('modelo_negocio');
   const comissaoTipo = watch('comissao_tipo');
   const formaPagamento = watch('forma_pagamento');
   const clienteNome = watch('cliente_nome');
@@ -90,19 +87,15 @@ export const NewProjectDialog = () => {
         comissao_tipo: data.comissao_tipo,
         comissao_valor_base: data.comissao_valor_base,
         comissao_pagamento: data.comissao_pagamento,
+        modelo_negocio: data.modelo_negocio,
+        valor_assinatura: data.valor_assinatura,
         status: 'aguardando_inicio'
       };
-      
       const fullDescription = stringifyMetadata(data.descricao || '', metadata);
-      
-      return createProject({
-        nome: data.nome,
-        cliente_nome: data.cliente_nome,
-        descricao: fullDescription
-      });
+      return createProject({ nome: data.nome, cliente_nome: data.cliente_nome, descricao: fullDescription });
     },
     onSuccess: () => {
-      showSuccess('Projeto e comissão registrados!');
+      showSuccess('Projeto registrado!');
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       setIsOpen(false);
       reset();
@@ -116,23 +109,19 @@ export const NewProjectDialog = () => {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-glow font-bold">
-          <PlusCircle className="w-5 h-5 mr-2" />
-          Novo Projeto
+          <PlusCircle className="w-5 h-5 mr-2" /> Novo Projeto
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo Escopo Comercial</DialogTitle>
-          <DialogDescription>
-            Defina os valores, parcelas e a estrutura de comissão.
-          </DialogDescription>
+          <DialogDescription>Defina o modelo de negócio e valores.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Nome do Projeto</Label>
-              <Input {...register('nome')} placeholder="Ex: App Delivery" />
-              {errors.nome && <p className="text-red-500 text-xs mt-1">{errors.nome.message}</p>}
+              <Input {...register('nome')} placeholder="Ex: SaaS Financeiro" />
             </div>
             <div className="space-y-2">
               <Label>Cliente</Label>
@@ -146,15 +135,38 @@ export const NewProjectDialog = () => {
                 placeholder="Selecionar Cliente"
                 emptyText="Cliente não encontrado."
               />
-              <Input {...register('cliente_whatsapp')} placeholder="WhatsApp do Cliente (opcional)" className="mt-2 h-8 text-xs" />
+            </div>
+          </div>
+
+          <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-4">
+            <div className="flex items-center gap-2 text-indigo-700 font-bold text-sm mb-2">
+              <Rocket className="w-4 h-4" /> Modelo de Entrega
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label>Tipo de Contrato</Label>
+                    <Select onValueChange={(v: any) => setValue('modelo_negocio', v)} defaultValue="exclusivo">
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="exclusivo">Sistema Exclusivo (Venda Única)</SelectItem>
+                            <SelectItem value="assinatura">Modelo de Assinatura (SaaS/Recorrente)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                {modeloNegocio === 'assinatura' && (
+                    <div className="space-y-2 animate-fade-in">
+                        <Label>Valor Mensalidade (R$)</Label>
+                        <Input type="number" step="0.01" {...register('valor_assinatura')} placeholder="0,00" />
+                        <p className="text-[10px] text-slate-500 font-medium italic">Pode definir depois se preferir.</p>
+                    </div>
+                )}
             </div>
           </div>
 
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-4">
-            <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm mb-2">
-              <CircleDollarSign className="w-4 h-4" /> Pagamento do Projeto
+            <div className="flex items-center gap-2 text-slate-700 font-bold text-sm mb-2">
+              <CircleDollarSign className="w-4 h-4" /> Setup / Implementação
             </div>
-            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Valor Total (R$)</Label>
@@ -172,7 +184,7 @@ export const NewProjectDialog = () => {
               </div>
               {formaPagamento === 'parcelado' && (
                 <div className="space-y-2 animate-fade-in">
-                  <Label>Nº de Parcelas</Label>
+                  <Label>Parcelas Setup</Label>
                   <Input type="number" {...register('projeto_parcelas')} min="1" />
                 </div>
               )}
@@ -181,11 +193,11 @@ export const NewProjectDialog = () => {
 
           <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-100 space-y-4">
                 <div className="flex items-center gap-2 text-amber-700 font-bold text-sm mb-2">
-                  <UserPlus className="w-4 h-4" /> Inteligência de Comissão
+                  <UserPlus className="w-4 h-4" /> Comissão Parceiro
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Nome do Parceiro</Label>
+                    <Label>Parceiro</Label>
                     <SmartCombobox 
                         options={partnersList}
                         value={parceiroNome || ''}
@@ -198,45 +210,35 @@ export const NewProjectDialog = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>WhatsApp Parceiro</Label>
+                    <Label>WhatsApp</Label>
                     <Input {...register('indicacao_whatsapp')} placeholder="Contato" />
                   </div>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-amber-100 pt-4">
                   <div className="space-y-2">
-                    <Label>Tipo Comissão</Label>
+                    <Label>Tipo</Label>
                     <Select onValueChange={(v: any) => setValue('comissao_tipo', v)} defaultValue="fixo">
                         <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="fixo">Valor Fixo (R$)</SelectItem>
-                            <SelectItem value="porcentagem">Porcentagem (%)</SelectItem>
-                        </SelectContent>
+                        <SelectContent><SelectItem value="fixo">Fixo</SelectItem><SelectItem value="porcentagem">%</SelectItem></SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>{comissaoTipo === 'fixo' ? 'Valor (R$)' : 'Porcentagem (%)'}</Label>
+                    <Label>Valor/Base</Label>
                     <Input type="number" step="0.01" {...register('comissao_valor_base')} placeholder="0,00" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Fluxo Comissão</Label>
+                    <Label>Fluxo</Label>
                     <Select onValueChange={(v: any) => setValue('comissao_pagamento', v)} defaultValue="unico">
                         <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="unico">Integral (Pagar de uma vez)</SelectItem>
-                            <SelectItem value="proporcional">Proporcional (Parcelado)</SelectItem>
-                        </SelectContent>
+                        <SelectContent><SelectItem value="unico">Integral</SelectItem><SelectItem value="proporcional">Parcelado</SelectItem></SelectContent>
                     </Select>
                   </div>
                 </div>
-                <p className="text-[10px] text-amber-700 font-medium">
-                  Dica: Se o projeto for 10x mas você quer pagar a comissão em 1x, use "Integral". Se quiser pagar um pouco por mês, use "Proporcional".
-                </p>
           </div>
 
           <DialogFooter>
             <Button type="submit" className="w-full bg-indigo-600" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Processando...' : 'Registrar Projeto e Comissão'}
+              {mutation.isPending ? 'Processando...' : 'Registrar Projeto'}
             </Button>
           </DialogFooter>
         </form>
