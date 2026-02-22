@@ -1,21 +1,25 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { getProjects } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getProjects, updateClient } from "@/lib/api";
 import { parseMetadata } from "@/lib/meta-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { User, Search, Phone, CircleDollarSign, TrendingUp, HandCoins, UserCheck, Briefcase, ChevronRight, PlayCircle, Clock, CheckCircle2, PauseCircle } from "lucide-react";
+import { User, Search, Phone, TrendingUp, HandCoins, Briefcase, ChevronRight, Edit } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { EditClientDialog } from "@/components/clients/EditClientDialog";
+import { showError, showSuccess } from "@/utils/toast";
 
 const Clients = () => {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClient, setSelectedClient] = useState<any>(null);
+  const [editingClient, setEditingClient] = useState<any>(null);
   const navigate = useNavigate();
 
   const { data: projects, isLoading } = useQuery({
@@ -77,6 +81,24 @@ const Clients = () => {
 
     return Array.from(clientsMap.values());
   }, [projects]);
+
+  const updateClientMutation = useMutation({
+    mutationFn: ({ originalName, data }: { originalName: string, data: any }) => updateClient(originalName, data),
+    onSuccess: () => {
+        showSuccess('Cliente atualizado com sucesso!');
+        queryClient.invalidateQueries({ queryKey: ['projects'] });
+        setEditingClient(null);
+        setSelectedClient(null);
+    },
+    onError: (error: Error) => {
+        showError(error.message);
+    }
+  });
+
+  const handleSaveClient = (data: any) => {
+    if (!editingClient) return;
+    updateClientMutation.mutate({ originalName: editingClient.nome, data });
+  };
 
   const filteredClients = clientsData.filter(c => 
     c.nome.toLowerCase().includes(searchTerm.toLowerCase())
@@ -175,114 +197,96 @@ const Clients = () => {
 
       <Sheet open={!!selectedClient} onOpenChange={(open) => !open && setSelectedClient(null)}>
         <SheetContent className="sm:max-w-[500px] overflow-y-auto border-l-0 shadow-2xl p-0">
-          <div className="p-8 space-y-8">
-            <SheetHeader className="mb-8">
-                <div className="flex items-center gap-4 mb-4">
-                    <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner">
-                        <User className="w-8 h-8" />
+          {selectedClient && (
+            <div className="p-8 space-y-8">
+              <SheetHeader className="mb-8">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner">
+                            <User className="w-8 h-8" />
+                        </div>
+                        <div className="flex-1">
+                            <SheetTitle className="text-2xl font-black text-slate-900 leading-tight">{selectedClient.nome}</SheetTitle>
+                            <SheetDescription className="font-bold flex items-center gap-2 mt-1">
+                                {selectedClient.whatsapp ? (
+                                    <a 
+                                        href={`https://wa.me/55${selectedClient.whatsapp.replace(/\D/g, "")}`} 
+                                        target="_blank" 
+                                        rel="noreferrer"
+                                        className="flex items-center gap-1.5 text-green-600 hover:underline"
+                                    >
+                                        <Phone className="w-4 h-4" /> {selectedClient.whatsapp}
+                                    </a>
+                                ) : "Sem contato registrado"}
+                            </SheetDescription>
+                        </div>
                     </div>
-                    <div className="flex-1">
-                        <SheetTitle className="text-2xl font-black text-slate-900 leading-tight">{selectedClient?.nome}</SheetTitle>
-                        <SheetDescription className="font-bold flex items-center gap-2 mt-1">
-                            {selectedClient?.whatsapp ? (
-                                <a 
-                                    href={`https://wa.me/55${selectedClient.whatsapp.replace(/\D/g, "")}`} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="flex items-center gap-1.5 text-green-600 hover:underline"
-                                >
-                                    <Phone className="w-4 h-4" /> {selectedClient.whatsapp}
-                                </a>
-                            ) : "Sem contato registrado"}
-                        </SheetDescription>
-                    </div>
-                </div>
-            </SheetHeader>
+                    <Button variant="outline" size="icon" onClick={() => setEditingClient(selectedClient)}>
+                        <Edit className="w-4 h-4" />
+                    </Button>
+                  </div>
+              </SheetHeader>
 
-            <div className="grid grid-cols-2 gap-4">
-                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 shadow-soft">
-                    <TrendingUp className="w-5 h-5 text-indigo-500 mb-2" />
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Contratado</p>
-                    <p className="text-xl font-black text-slate-900">{formatCurrency(selectedClient?.totalInvestido || 0)}</p>
-                </div>
-                <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-100 shadow-soft">
-                    <HandCoins className="w-5 h-5 text-emerald-600 mb-2" />
-                    <p className="text-[10px] font-black text-emerald-700 uppercase tracking-wider">Fluxo a Receber</p>
-                    <p className="text-xl font-black text-emerald-900">{formatCurrency(selectedClient?.aReceber || 0)}</p>
-                </div>
+              <div className="grid grid-cols-2 gap-4">
+                  <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 shadow-soft">
+                      <TrendingUp className="w-5 h-5 text-indigo-500 mb-2" />
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Contratado</p>
+                      <p className="text-xl font-black text-slate-900">{formatCurrency(selectedClient.totalInvestido || 0)}</p>
+                  </div>
+                  <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-100 shadow-soft">
+                      <HandCoins className="w-5 h-5 text-emerald-600 mb-2" />
+                      <p className="text-[10px] font-black text-emerald-700 uppercase tracking-wider">Fluxo a Receber</p>
+                      <p className="text-xl font-black text-emerald-900">{formatCurrency(selectedClient.aReceber || 0)}</p>
+                  </div>
+              </div>
+
+              <section>
+                  <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                          <Briefcase className="w-4 h-4" /> Histórico de Projetos
+                      </h3>
+                      <Badge variant="outline" className="text-[10px] font-black">{selectedClient.projetos.length} Projetos</Badge>
+                  </div>
+                  <div className="space-y-3">
+                      {selectedClient.projetos.map((p: any) => (
+                          <button 
+                              key={p.id} 
+                              onClick={() => {
+                                  setSelectedClient(null);
+                                  navigate(`/projetos/${p.id}`);
+                              }}
+                              className="w-full text-left p-4 rounded-xl border border-slate-100 bg-white shadow-soft hover:border-indigo-300 hover:shadow-glow transition-all flex justify-between items-center group"
+                          >
+                              <div className="flex items-center gap-4">
+                                  <div className="p-2 rounded-lg bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                                      <ChevronRight className="w-4 h-4" />
+                                  </div>
+                                  <div>
+                                      <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{p.nome}</p>
+                                      <div className="mt-1">{getStatusBadge(p.status)}</div>
+                                  </div>
+                              </div>
+                              <div className="text-right">
+                                  <p className="font-black text-slate-800">{formatCurrency(p.valor)}</p>
+                                  {p.parcelas > 1 && <p className="text-[9px] text-indigo-600 font-bold uppercase">{p.parcelas}X Parcelado</p>}
+                              </div>
+                          </button>
+                      ))}
+                      {selectedClient.projetos.length === 0 && <p className="text-xs text-slate-400 italic py-4 text-center bg-slate-50 rounded-xl">Nenhum projeto direto.</p>}
+                  </div>
+              </section>
             </div>
-
-            <section>
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <Briefcase className="w-4 h-4" /> Histórico de Projetos
-                    </h3>
-                    <Badge variant="outline" className="text-[10px] font-black">{selectedClient?.projetos.length} Projetos</Badge>
-                </div>
-                <div className="space-y-3">
-                    {selectedClient?.projetos.map((p: any) => (
-                        <button 
-                            key={p.id} 
-                            onClick={() => {
-                                setSelectedClient(null);
-                                navigate(`/projetos/${p.id}`);
-                            }}
-                            className="w-full text-left p-4 rounded-xl border border-slate-100 bg-white shadow-soft hover:border-indigo-300 hover:shadow-glow transition-all flex justify-between items-center group"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="p-2 rounded-lg bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                                    <ChevronRight className="w-4 h-4" />
-                                </div>
-                                <div>
-                                    <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{p.nome}</p>
-                                    <div className="mt-1">{getStatusBadge(p.status)}</div>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <p className="font-black text-slate-800">{formatCurrency(p.valor)}</p>
-                                {p.parcelas > 1 && <p className="text-[9px] text-indigo-600 font-bold uppercase">{p.parcelas}X Parcelado</p>}
-                            </div>
-                        </button>
-                    ))}
-                    {selectedClient?.projetos.length === 0 && <p className="text-xs text-slate-400 italic py-4 text-center bg-slate-50 rounded-xl">Nenhum projeto direto.</p>}
-                </div>
-            </section>
-
-            <section>
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xs font-black text-amber-600 uppercase tracking-widest flex items-center gap-2">
-                        <UserCheck className="w-4 h-4" /> Indicações Realizadas
-                    </h3>
-                    <Badge variant="outline" className="border-amber-200 text-amber-700 text-[10px] font-black">{selectedClient?.indicacoes.length} Indicações</Badge>
-                </div>
-                <div className="space-y-3">
-                    {selectedClient?.indicacoes.map((ind: any, i: number) => (
-                        <button 
-                            key={i} 
-                            onClick={() => {
-                                setSelectedClient(null);
-                                navigate(`/projetos/${ind.id}`);
-                            }}
-                            className="w-full text-left p-4 rounded-xl border border-amber-100 bg-amber-50/30 hover:border-amber-300 hover:bg-amber-50 transition-all flex justify-between items-center group"
-                        >
-                            <div>
-                                <p className="font-bold text-amber-900 group-hover:text-amber-700">{ind.projeto}</p>
-                                <p className="text-[10px] text-amber-700 font-black uppercase flex items-center gap-1 mt-1">
-                                    <User className="w-3 h-3" /> Indicou: {ind.indicado}
-                                </p>
-                            </div>
-                            <div className="flex flex-col items-end gap-1.5">
-                                <div className="font-black text-amber-900">{formatCurrency(ind.valorProjeto)}</div>
-                                {getStatusBadge(ind.status)}
-                            </div>
-                        </button>
-                    ))}
-                    {selectedClient?.indicacoes.length === 0 && <p className="text-xs text-slate-400 italic py-4 text-center bg-slate-50 rounded-xl">Ainda não fez indicações.</p>}
-                </div>
-            </section>
-          </div>
+          )}
         </SheetContent>
       </Sheet>
+
+      <EditClientDialog
+        open={!!editingClient}
+        onOpenChange={(open) => !open && setEditingClient(null)}
+        client={editingClient}
+        onSave={handleSaveClient}
+        isSaving={updateClientMutation.isPending}
+      />
     </div>
   );
 };

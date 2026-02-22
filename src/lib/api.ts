@@ -37,6 +37,14 @@ export const createProject = (data: any): Promise<Project> => request('/projetos
 export const updateProject = (id: number, data: Partial<Project>): Promise<void> => request(`/projetos/${id}`, { method: 'POST', body: JSON.stringify(data) });
 export const deleteProject = (id: number): Promise<void> => request(`/projetos/${id}`, { method: 'DELETE' });
 
+// Clientes
+export const updateClient = (originalName: string, data: { new_name: string, new_whatsapp: string }): Promise<void> => {
+  return request('/clientes', { 
+    method: 'POST', 
+    body: JSON.stringify({ original_name: originalName, ...data }) 
+  });
+};
+
 // Funcionalidades
 export const getFeaturesByProjectId = async (projectId: number): Promise<Feature[]> => extractList(await request<any>(`/funcionalidades?projeto_id=${projectId}`));
 export const createFeature = (data: any): Promise<Feature> => request('/funcionalidades', { method: 'POST', body: JSON.stringify(data) });

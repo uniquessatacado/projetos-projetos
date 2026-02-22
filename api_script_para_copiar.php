@@ -116,6 +116,40 @@ try {
             }
             break;
 
+        case 'clientes':
+            if ($method === 'POST') {
+                $original_name = $input['original_name'] ?? '';
+                $new_name = $input['new_name'] ?? '';
+                $new_whatsapp = $input['new_whatsapp'] ?? '';
+
+                if (empty($original_name) || empty($new_name)) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Nome original e novo nome são obrigatórios.']);
+                    exit;
+                }
+
+                $pdo->beginTransaction();
+
+                $stmt = $pdo->prepare("SELECT id, descricao FROM projetos WHERE cliente_nome = ?");
+                $stmt->execute([$original_name]);
+                $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                $updateNameStmt = $pdo->prepare("UPDATE projetos SET cliente_nome = ? WHERE cliente_nome = ?");
+                $updateNameStmt->execute([$new_name, $original_name]);
+
+                $updateDescStmt = $pdo->prepare("UPDATE projetos SET descricao = ? WHERE id = ?");
+                foreach ($projects as $project) {
+                    $meta = json_decode($project['descricao'], true) ?: [];
+                    $meta['cliente_whatsapp'] = $new_whatsapp;
+                    $new_descricao = json_encode($meta);
+                    $updateDescStmt->execute([$new_descricao, $project['id']]);
+                }
+
+                $pdo->commit();
+                echo json_encode(['success' => true]);
+            }
+            break;
+
         case 'funcionalidades':
             if ($method === 'GET') {
                 $pid = $_GET['projeto_id'] ?? 0;
