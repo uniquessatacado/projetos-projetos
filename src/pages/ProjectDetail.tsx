@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getProjectById, getFeaturesByProjectId, deleteFeature, updateProject, updateFeature } from '@/lib/api';
+import { getProjectById, getFeaturesByProjectId, updateProject, updateFeature } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -14,6 +14,7 @@ import { ptBR } from 'date-fns/locale';
 import { NewFeatureDialog } from '@/components/project/NewFeatureDialog';
 import { WorkflowGuide } from '@/components/project/WorkflowGuide';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { parseMetadata, stringifyMetadata, getCleanDescription } from '@/lib/meta-utils';
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -32,8 +33,14 @@ const ProjectDetail = () => {
     enabled: !!project,
   });
 
+  const projectMeta = parseMetadata<{ status?: string, started_at?: string, prazo_entrega?: string }>(project?.descricao);
+  const currentProjectStatus = projectMeta.status || 'aguardando_inicio';
+
   const updateProjectMutation = useMutation({
-    mutationFn: (data: Partial<Project>) => updateProject(project!.id, data),
+    mutationFn: (newMeta: any) => {
+        const updatedDesc = stringifyMetadata(getCleanDescription(project?.descricao), { ...projectMeta, ...newMeta });
+        return updateProject(project!.id, { ...project, descricao: updatedDesc });
+    },
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['project', id] });
         showSuccess('Status do projeto atualizado!');
@@ -41,22 +48,79 @@ const ProjectDetail = () => {
   });
 
   const toggleFeatureStatus = useMutation({
-    mutationFn: ({ fid, status }: { fid: number, status: string }) => updateFeature(fid, { status: status as any }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['features', project?.id] })
+    mutationFn: ({ feature, status }: { feature: Feature, status: string }) => {
+        const meta = parseMetadata<any>(feature.descricao);
+        const updatedDesc = stringifyMetadata(getCleanDescription(feature.descricao), { ...meta, status });
+        return updateFeature(feature.id, { ...feature, descricao: updatedDesc });
+    },
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['features', project?.id] });
+        showSuccess('Status da função atualizado!');
+    }
   });
+
+  const getFeatureData = (f: Feature) => {
+    const meta = parseMetadata<{ status?: string, observacoes?: string }>(f.descricao);
+    return {
+        status: meta.status || 'pendente',
+        observacoes: meta.observacoes || '',
+        cleanDesc: getCleanDescription(f.descricao)
+    };
+  };
 
   const calculateProgress = () => {
     if (!features || features.length === 0) return 0;
-    const completed = features.filter(f => f.status === 'concluido').length;
+    const completed = features.filter(f => getFeatureData(f).status === 'concluido').length;
     return Math.round((completed / features.length) * 100);
   };
 
   const getElapsedTime = () => {
-    if (!project?.started_at) return "Não iniciado";
-    return formatDistanceToNow(new Date(project.started_at), { locale: ptBR, addSuffix: false });
+    if (!projectMeta.started_at) return "Não iniciado";
+    return formatDistanceToNow(new Date(projectMeta.started_at), { locale: ptBR, addSuffix: false });
   };
 
-  if (isLoadingProject) return <div className="p-8"><Skeleton className="h-96 w-full" /></div>;
+  if (isLoadingProject || isLoadingFeatures) return <div className="p-8"><Skeleton className="h-96 w-full" /></div>;
+
+  const renderFeatureList = (filterStatus?: string) => {
+    const filtered = filterStatus 
+        ? features?.filter(f => getFeatureData(f).status === filterStatus)
+        : features;
+
+    if (!filtered || filtered.length === 0) {
+        return <p className="text-center py-8 text-slate-400 text-sm">Nenhuma funcionalidade encontrada nesta categoria.</p>;
+    }
+
+    return filtered.map((f) => {
+        const data = getFeatureData(f);
+        return (
+            <div key={f.id} className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white rounded-xl border border-slate-100 hover:border-indigo-200 hover:shadow-soft transition-all">
+                <div className="flex items-center gap-4">
+                    <div className={`p-2 rounded-full ${data.status === 'concluido' ? 'bg-emerald-100 text-emerald-600' : data.status === 'fazendo' ? 'bg-amber-100 text-amber-600 animate-pulse' : 'bg-slate-100 text-slate-400'}`}>
+                        <ListTodo className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h4 className={`font-bold ${data.status === 'concluido' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{f.titulo}</h4>
+                        <p className="text-xs text-slate-500 line-clamp-1">{data.cleanDesc || "Sem detalhes."}</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3 mt-4 sm:mt-0">
+                    <select 
+                        value={data.status} 
+                        onChange={(e) => toggleFeatureStatus.mutate({ feature: f, status: e.target.value })}
+                        className="text-xs font-semibold border rounded-lg px-2 py-1 bg-slate-50 border-slate-200 outline-none cursor-pointer"
+                    >
+                        <option value="pendente">NA FILA</option>
+                        <option value="fazendo">FAZENDO</option>
+                        <option value="concluido">CONCLUÍDO</option>
+                    </select>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600">
+                        <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                </div>
+            </div>
+        );
+    });
+  };
 
   return (
     <div className="p-4 lg:p-8 animate-fade-in">
@@ -65,22 +129,22 @@ const ProjectDetail = () => {
             <ArrowLeft className="w-4 h-4 mr-2" /> Projetos
         </Button>
         <div className="flex gap-2">
-            {project?.status === 'aguardando_inicio' && (
+            {currentProjectStatus === 'aguardando_inicio' && (
                 <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => updateProjectMutation.mutate({ status: 'em_andamento', started_at: new Date().toISOString() })}>
                     <Play className="w-4 h-4 mr-2" /> Iniciar Projeto
                 </Button>
             )}
-            {project?.status === 'em_andamento' && (
+            {currentProjectStatus === 'em_andamento' && (
                 <Button variant="outline" className="text-amber-600 border-amber-200" onClick={() => updateProjectMutation.mutate({ status: 'pausado' })}>
                     <Pause className="w-4 h-4 mr-2" /> Pausar
                 </Button>
             )}
-            {project?.status === 'pausado' && (
+            {currentProjectStatus === 'pausado' && (
                 <Button variant="outline" className="text-emerald-600 border-emerald-200" onClick={() => updateProjectMutation.mutate({ status: 'em_andamento' })}>
                     <Play className="w-4 h-4 mr-2" /> Retomar
                 </Button>
             )}
-            {project?.status !== 'concluido' && project?.status !== 'aguardando_inicio' && (
+            {currentProjectStatus !== 'concluido' && currentProjectStatus !== 'aguardando_inicio' && (
                 <Button className="bg-indigo-600" onClick={() => updateProjectMutation.mutate({ status: 'concluido', finished_at: new Date().toISOString() })}>
                     <CheckCircle className="w-4 h-4 mr-2" /> Finalizar
                 </Button>
@@ -94,12 +158,12 @@ const ProjectDetail = () => {
                 <div className="flex items-center gap-3 mb-2">
                     <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">{project?.nome}</h1>
                     <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100 border-none px-3">
-                        {project?.status.replace('_', ' ').toUpperCase()}
+                        {currentProjectStatus.replace('_', ' ').toUpperCase()}
                     </Badge>
                 </div>
                 <div className="flex flex-wrap gap-4 text-sm text-slate-500 font-medium">
                     <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-indigo-500" /> Iniciado há: {getElapsedTime()}</span>
-                    <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-indigo-500" /> Entrega: {project?.prazo_entrega ? format(new Date(project.prazo_entrega), 'dd/MM/yyyy') : 'Não definida'}</span>
+                    <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-indigo-500" /> Entrega: {projectMeta.prazo_entrega ? format(new Date(projectMeta.prazo_entrega), 'dd/MM/yyyy') : 'Não definida'}</span>
                 </div>
             </header>
 
@@ -124,33 +188,13 @@ const ProjectDetail = () => {
                             <TabsTrigger value="fazendo" className="data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none h-12">Fazendo</TabsTrigger>
                         </TabsList>
                         <TabsContent value="todas" className="p-4 space-y-3">
-                            {features?.map((f) => (
-                                <div key={f.id} className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white rounded-xl border border-slate-100 hover:border-indigo-200 hover:shadow-soft transition-all">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`p-2 rounded-full ${f.status === 'concluido' ? 'bg-emerald-100 text-emerald-600' : f.status === 'fazendo' ? 'bg-amber-100 text-amber-600 animate-pulse' : 'bg-slate-100 text-slate-400'}`}>
-                                            <ListTodo className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                            <h4 className={`font-bold ${f.status === 'concluido' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{f.titulo}</h4>
-                                            <p className="text-xs text-slate-500 line-clamp-1">{f.descricao || "Sem detalhes."}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3 mt-4 sm:mt-0">
-                                        <select 
-                                            value={f.status} 
-                                            onChange={(e) => toggleFeatureStatus.mutate({ fid: f.id, status: e.target.value })}
-                                            className="text-xs font-semibold border rounded-lg px-2 py-1 bg-slate-50 border-slate-200 outline-none"
-                                        >
-                                            <option value="pendente">PENDENTE</option>
-                                            <option value="fazendo">FAZENDO</option>
-                                            <option value="concluido">CONCLUÍDO</option>
-                                        </select>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500">
-                                            <MoreHorizontal className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
+                            {renderFeatureList()}
+                        </TabsContent>
+                        <TabsContent value="fila" className="p-4 space-y-3">
+                            {renderFeatureList('pendente')}
+                        </TabsContent>
+                        <TabsContent value="fazendo" className="p-4 space-y-3">
+                            {renderFeatureList('fazendo')}
                         </TabsContent>
                     </Tabs>
                 </CardContent>
