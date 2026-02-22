@@ -6,10 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Play, Pause, CheckCircle, Clock, Calendar, MessageSquare, ListTodo, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Play, Pause, CheckCircle, Clock, Calendar, ListTodo, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { Feature } from '@/types';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { NewFeatureDialog } from '@/components/project/NewFeatureDialog';
 import { WorkflowGuide } from '@/components/project/WorkflowGuide';
@@ -39,7 +39,13 @@ const ProjectDetail = () => {
     enabled: !!project,
   });
 
-  const projectMeta = parseMetadata<{ status?: string, started_at?: string, prazo_entrega?: string }>(project?.descricao);
+  const projectMeta = parseMetadata<{ 
+    status?: string, 
+    started_at?: string, 
+    paused_at?: string,
+    prazo_entrega?: string 
+  }>(project?.descricao);
+  
   const currentProjectStatus = projectMeta.status || 'aguardando_inicio';
 
   const updateProjectMutation = useMutation({
@@ -49,6 +55,7 @@ const ProjectDetail = () => {
     },
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['project', id] });
+        queryClient.invalidateQueries({ queryKey: ['projects'] });
         showSuccess('Status atualizado!');
     }
   });
@@ -69,6 +76,7 @@ const ProjectDetail = () => {
     },
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['features', project?.id] });
+        queryClient.invalidateQueries({ queryKey: ['projects'] });
     }
   });
 
@@ -101,7 +109,7 @@ const ProjectDetail = () => {
         return (
             <div key={f.id} className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-100 hover:shadow-soft transition-all">
                 <div className="flex items-center gap-4">
-                    <div className={`p-2 rounded-full ${data.status === 'concluido' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
+                    <div className={`p-2 rounded-full ${data.status === 'concluido' ? 'bg-green-100 text-green-600' : data.status === 'fazendo' ? 'bg-amber-100 text-amber-600 animate-pulse' : 'bg-slate-100 text-slate-400'}`}>
                         <ListTodo className="w-5 h-5" />
                     </div>
                     <div>
@@ -113,7 +121,7 @@ const ProjectDetail = () => {
                     <select 
                         value={data.status} 
                         onChange={(e) => toggleFeatureStatus.mutate({ feature: f, status: e.target.value })}
-                        className="text-xs border rounded p-1"
+                        className="text-xs font-bold border rounded p-1.5 bg-slate-50 border-slate-200 outline-none"
                     >
                         <option value="pendente">FILA</option>
                         <option value="fazendo">FAZENDO</option>
@@ -137,13 +145,30 @@ const ProjectDetail = () => {
       <div className="flex justify-between items-center mb-8">
         <Button variant="ghost" onClick={() => navigate('/')}><ArrowLeft className="w-4 mr-2" /> Voltar</Button>
         <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsEditProjectOpen(true)}><Edit className="w-4 mr-2" /> Editar</Button>
-            {currentProjectStatus === 'aguardando_inicio' ? (
-                <Button className="bg-green-600 hover:bg-green-700 shadow-glow" onClick={() => updateProjectMutation.mutate({ status: 'em_andamento', started_at: new Date().toISOString() })}>
-                    <Play className="w-4 mr-2" /> Iniciar Agora
+            <Button variant="outline" onClick={() => setIsEditProjectOpen(true)}><Edit className="w-4 mr-2" /> Configurações</Button>
+            
+            {currentProjectStatus === 'aguardando_inicio' && (
+                <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-glow" onClick={() => updateProjectMutation.mutate({ status: 'em_andamento', started_at: new Date().toISOString() })}>
+                    <Play className="w-4 mr-2" /> Iniciar Projeto
                 </Button>
-            ) : (
-                <Button variant="secondary" onClick={() => updateProjectMutation.mutate({ status: 'aguardando_inicio' })}>Reiniciar</Button>
+            )}
+
+            {currentProjectStatus === 'em_andamento' && (
+                <Button variant="outline" className="border-amber-200 text-amber-600 hover:bg-amber-50" onClick={() => updateProjectMutation.mutate({ status: 'pausado', paused_at: new Date().toISOString() })}>
+                    <Pause className="w-4 mr-2" /> Pausar
+                </Button>
+            )}
+
+            {currentProjectStatus === 'pausado' && (
+                <Button className="bg-indigo-600" onClick={() => updateProjectMutation.mutate({ status: 'em_andamento', started_at: new Date().toISOString(), paused_at: null })}>
+                    <Play className="w-4 mr-2" /> Retomar Atividade
+                </Button>
+            )}
+
+            {currentProjectStatus === 'concluido' && (
+                <Button variant="secondary" onClick={() => updateProjectMutation.mutate({ status: 'aguardando_inicio', started_at: null, paused_at: null })}>
+                    Reiniciar Escopo
+                </Button>
             )}
         </div>
       </div>
@@ -152,32 +177,33 @@ const ProjectDetail = () => {
         <div className="lg:col-span-2 space-y-6">
             <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-3">
-                    <h1 className="text-4xl font-black text-slate-900">{project?.nome}</h1>
-                    <Badge variant="outline" className="bg-primary-50 text-primary-700 border-primary-200">
-                        {currentProjectStatus.toUpperCase()}
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tight">{project?.nome}</h1>
+                    <Badge className={`font-black shadow-sm ${currentProjectStatus === 'em_andamento' ? 'bg-indigo-500 hover:bg-indigo-600' : currentProjectStatus === 'pausado' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-slate-500'}`}>
+                        {currentProjectStatus.replace('_', ' ').toUpperCase()}
                     </Badge>
                 </div>
-                <p className="text-slate-500 font-medium flex items-center gap-2">
-                    <Calendar className="w-4 h-4" /> Cliente: {project?.cliente_nome}
-                </p>
+                <div className="flex items-center gap-4 text-slate-500 font-bold text-sm">
+                    <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-indigo-400" /> {project?.cliente_nome}</span>
+                    <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-indigo-400" /> Prazo: {projectMeta.prazo_entrega || 'Não definido'}</span>
+                </div>
             </div>
 
-            <Card className="shadow-card border-none">
-                <CardHeader className="flex flex-row items-center justify-between border-b bg-slate-50/50">
+            <Card className="shadow-card border-none overflow-hidden">
+                <CardHeader className="flex flex-row items-center justify-between border-b bg-slate-50/50 p-6">
                     <div>
-                        <CardTitle>Escopo de Funções</CardTitle>
-                        <CardDescription>Gerencie as entregas técnicas.</CardDescription>
+                        <CardTitle className="text-xl">Funcionalidades do Escopo</CardTitle>
+                        <CardDescription>Gerenciamento técnico das entregas.</CardDescription>
                     </div>
                     <NewFeatureDialog projectId={project!.id}>
-                        <Button size="sm">Nova Função</Button>
+                        <Button size="sm" className="bg-indigo-600">Nova Função</Button>
                     </NewFeatureDialog>
                 </CardHeader>
                 <CardContent className="p-0">
                     <Tabs defaultValue="todas">
-                        <TabsList className="w-full justify-start rounded-none px-6 border-b bg-transparent">
-                            <TabsTrigger value="todas">Todas</TabsTrigger>
-                            <TabsTrigger value="fila">Fila</TabsTrigger>
-                            <TabsTrigger value="fazendo">Fazendo</TabsTrigger>
+                        <TabsList className="w-full justify-start rounded-none px-6 border-b bg-transparent h-12">
+                            <TabsTrigger value="todas" className="h-12 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 bg-transparent">Todas</TabsTrigger>
+                            <TabsTrigger value="fila" className="h-12 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 bg-transparent">Aguardando</TabsTrigger>
+                            <TabsTrigger value="fazendo" className="h-12 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 bg-transparent">Em Produção</TabsTrigger>
                         </TabsList>
                         <div className="p-6 space-y-3">
                             <TabsContent value="todas" className="mt-0">{renderFeatureList()}</TabsContent>
@@ -190,18 +216,28 @@ const ProjectDetail = () => {
         </div>
 
         <aside className="space-y-6">
-            <Card className="bg-indigo-600 text-white border-none shadow-glow">
+            <Card className="bg-indigo-600 text-white border-none shadow-glow overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <Clock className="w-24 h-24" />
+                </div>
                 <CardHeader>
-                    <CardTitle className="text-lg">Progresso Real</CardTitle>
-                    <div className="text-3xl font-black">{calculateProgress()}%</div>
+                    <CardTitle className="text-indigo-100 text-sm font-black uppercase tracking-widest">Progresso Real</CardTitle>
+                    <div className="text-5xl font-black">{calculateProgress()}%</div>
                 </CardHeader>
                 <CardContent>
                     <Progress value={calculateProgress()} className="bg-white/20 h-2 mb-4" />
-                    {projectMeta.started_at && (
-                        <p className="text-xs text-indigo-100 flex items-center gap-2">
-                            <Clock className="w-3" /> Ativo há {getElapsedTime(projectMeta.started_at)}
-                        </p>
-                    )}
+                    <div className="space-y-2">
+                        {projectMeta.started_at && (
+                            <div className="flex items-center gap-2 text-xs font-bold bg-white/10 p-2 rounded-lg">
+                                <Clock className="w-4 h-4" /> Ativo há {getElapsedTime(projectMeta.started_at)}
+                            </div>
+                        )}
+                        {projectMeta.paused_at && currentProjectStatus === 'pausado' && (
+                            <div className="flex items-center gap-2 text-xs font-bold bg-amber-500/30 p-2 rounded-lg">
+                                <Pause className="w-4 h-4" /> Pausado há {getElapsedTime(projectMeta.paused_at)}
+                            </div>
+                        )}
+                    </div>
                 </CardContent>
             </Card>
             <WorkflowGuide />
