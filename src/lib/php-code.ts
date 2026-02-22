@@ -8,7 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
 }
 
-// CONFIGURAÇÕES OBRIGATÓRIAS
+// CONFIGURAÇÕES DO BANCO
 $host = '172.22.0.2';
 $db   = 'projetos'; 
 $user = 'root';
@@ -19,61 +19,12 @@ function getPdo() {
     try {
         $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        initTables($pdo);
         return $pdo;
     } catch (PDOException $e) {
-        try {
-            $pdo = new PDO("mysql:host=$host;charset=utf8", $user, $pass);
-            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            $pdo->exec("CREATE DATABASE IF NOT EXISTS \`$db\`");
-            $pdo->exec("USE \`$db\`");
-            initTables($pdo);
-            return $pdo;
-        } catch (PDOException $e2) {
-            http_response_code(500);
-            echo json_encode(['error' => 'Falha na conexão: ' . $e2->getMessage()]);
-            exit;
-        }
+        http_response_code(500);
+        echo json_encode(['error' => 'Falha na conexão: ' . $e->getMessage()]);
+        exit;
     }
-}
-
-function initTables($pdo) {
-    // Projetos
-    $pdo->exec("CREATE TABLE IF NOT EXISTS projetos (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        nome VARCHAR(255) NOT NULL,
-        cliente_nome VARCHAR(255) NOT NULL,
-        descricao LONGTEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB");
-
-    // Funcionalidades
-    $pdo->exec("CREATE TABLE IF NOT EXISTS funcionalidades (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        projeto_id INT NOT NULL,
-        titulo VARCHAR(255) NOT NULL,
-        descricao LONGTEXT,
-        complexidade VARCHAR(50) NOT NULL,
-        categoria VARCHAR(100),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (projeto_id) REFERENCES projetos(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB");
-
-    // Templates / Base de Conhecimento
-    $pdo->exec("CREATE TABLE IF NOT EXISTS templates (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        nome VARCHAR(255) NOT NULL,
-        descricao LONGTEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB");
-
-    // Configurações
-    $pdo->exec("CREATE TABLE IF NOT EXISTS configuracoes (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        chave VARCHAR(50) UNIQUE NOT NULL,
-        valor TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB");
 }
 
 $path = isset($_GET['path']) ? $_GET['path'] : '';
