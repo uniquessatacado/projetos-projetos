@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo } from 'react';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { createProject } from '@/lib/api';
+import { createProject, getProjects } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -15,11 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PlusCircle, CircleDollarSign, UserPlus, Phone } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { Project } from '@/types';
-import { stringifyMetadata } from '@/lib/meta-utils';
+import { stringifyMetadata, parseMetadata } from '@/lib/meta-utils';
+import { SmartCombobox } from '@/components/ui/smart-combobox';
 
 const projectSchema = z.object({
   nome: z.string().min(3, { message: 'O nome do projeto é obrigatório.' }),
-  cliente_nome: z.string().min(3, { message: 'O nome do cliente é obrigatório.' }),
+  cliente_nome: z.string().min(2, { message: 'Selecione ou digite um cliente.' }),
   cliente_whatsapp: z.string().optional(),
   descricao: z.string().optional(),
   valor_fechado: z.string().optional(),
@@ -38,6 +39,30 @@ export const NewProjectDialog = () => {
   const [isOpen, setIsOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  const { data: projects } = useQuery({
+    queryKey: ['projects'],
+    queryFn: getProjects,
+  });
+
+  // Extrair lista única de clientes e parceiros para o autocomplete
+  const { clientsList, partnersList } = useMemo(() => {
+    if (!projects) return { clientsList: [], partnersList: [] };
+    
+    const clients = new Map();
+    const partners = new Map();
+
+    projects.forEach(p => {
+      const meta = parseMetadata<any>(p.descricao);
+      if (p.cliente_nome) clients.set(p.cliente_nome, { value: p.cliente_nome, label: p.cliente_nome, whatsapp: meta.cliente_whatsapp });
+      if (meta.indicacao_nome) partners.set(meta.indicacao_nome, { value: meta.indicacao_nome, label: meta.indicacao_nome, whatsapp: meta.indicacao_whatsapp });
+    });
+
+    return { 
+      clientsList: Array.from(clients.values()), 
+      partnersList: Array.from(partners.values()) 
+    };
+  }, [projects]);
+
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
@@ -50,6 +75,8 @@ export const NewProjectDialog = () => {
 
   const comissaoTipo = watch('comissao_tipo');
   const formaPagamento = watch('forma_pagamento');
+  const clienteNome = watch('cliente_nome');
+  const parceiroNome = watch('indicacao_nome');
 
   const mutation = useMutation<Project, Error, ProjectFormData>({
     mutationFn: (data) => {
@@ -105,10 +132,21 @@ export const NewProjectDialog = () => {
             <div className="space-y-2">
               <Label>Nome do Projeto</Label>
               <Input {...register('nome')} placeholder="Ex: App Delivery" />
+              {errors.nome && <p className="text-red-500 text-xs mt-1">{errors.nome.message}</p>}
             </div>
             <div className="space-y-2">
               <Label>Cliente</Label>
-              <Input {...register('cliente_nome')} placeholder="Nome do Cliente" />
+              <SmartCombobox 
+                options={clientsList}
+                value={clienteNome}
+                onSelect={(val, wa) => {
+                    setValue('cliente_nome', val);
+                    if (wa) setValue('cliente_whatsapp', wa);
+                }}
+                placeholder="Selecionar Cliente"
+                emptyText="Cliente não encontrado."
+              />
+              <Input {...register('cliente_whatsapp')} placeholder="WhatsApp do Cliente (opcional)" className="mt-2 h-8 text-xs" />
             </div>
           </div>
 
@@ -148,7 +186,16 @@ export const NewProjectDialog = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Nome do Parceiro</Label>
-                    <Input {...register('indicacao_nome')} placeholder="Quem indicou?" />
+                    <SmartCombobox 
+                        options={partnersList}
+                        value={parceiroNome || ''}
+                        onSelect={(val, wa) => {
+                            setValue('indicacao_nome', val);
+                            if (wa) setValue('indicacao_whatsapp', wa);
+                        }}
+                        placeholder="Selecionar Parceiro"
+                        emptyText="Parceiro não encontrado."
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>WhatsApp Parceiro</Label>
@@ -172,16 +219,19 @@ export const NewProjectDialog = () => {
                     <Input type="number" step="0.01" {...register('comissao_valor_base')} placeholder="0,00" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Pagamento Comissão</Label>
+                    <Label>Fluxo Comissão</Label>
                     <Select onValueChange={(v: any) => setValue('comissao_pagamento', v)} defaultValue="unico">
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="unico">Integral (À Vista)</SelectItem>
+                            <SelectItem value="unico">Integral (Pagar de uma vez)</SelectItem>
                             <SelectItem value="proporcional">Proporcional (Parcelado)</SelectItem>
                         </SelectContent>
                     </Select>
                   </div>
                 </div>
+                <p className="text-[10px] text-amber-700 font-medium">
+                  Dica: Se o projeto for 10x mas você quer pagar a comissão em 1x, use "Integral". Se quiser pagar um pouco por mês, use "Proporcional".
+                </p>
           </div>
 
           <DialogFooter>
