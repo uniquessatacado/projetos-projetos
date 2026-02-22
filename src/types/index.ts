@@ -48,3 +48,12 @@ export interface PaginatedResponse<T> {
     isLastPage: boolean;
   };
 }
+
+export interface AdminVaultItem {
+  id: number;
+  title: string;
+  item_type: 'login' | 'api' | 'note';
+  link?: string;
+  username?: string;
+  secret_value?: string;
+}

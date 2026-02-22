@@ -10,6 +10,7 @@ import Templates from "./pages/Templates";
 import Settings from "./pages/Settings";
 import Clients from "./pages/Clients";
 import KnowledgeBase from "./pages/KnowledgeBase";
+import AdminVault from "./pages/AdminVault";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/clientes" element={<Clients />} />
             <Route path="/conhecimento" element={<KnowledgeBase />} />
             <Route path="/templates" element={<Templates />} />
+            <Route path="/cofre" element={<AdminVault />} />
             <Route path="/configuracoes" element={<Settings />} />
           </Route>
           <Route path="*" element={<NotFound />} />

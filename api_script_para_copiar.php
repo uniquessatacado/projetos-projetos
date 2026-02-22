@@ -66,6 +66,16 @@ try {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB");
 
+    $pdo->exec("CREATE TABLE IF NOT EXISTS admin_vault (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        item_type VARCHAR(50) NOT NULL,
+        link TEXT,
+        username VARCHAR(255),
+        secret_value TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB");
+
 } catch (PDOException $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Erro de Banco de Dados: ' . $e->getMessage()]);
@@ -168,6 +178,24 @@ try {
             }
             break;
         
+        case 'admin_vault':
+            if ($method === 'GET') {
+                echo json_encode($pdo->query("SELECT * FROM admin_vault ORDER BY title ASC")->fetchAll(PDO::FETCH_ASSOC));
+            } elseif ($method === 'POST') {
+                if ($id) {
+                    $pdo->prepare("UPDATE admin_vault SET title = ?, item_type = ?, link = ?, username = ?, secret_value = ? WHERE id = ?")
+                        ->execute([$input['title'], $input['item_type'], $input['link'] ?? null, $input['username'] ?? null, $input['secret_value'] ?? null, $id]);
+                } else {
+                    $pdo->prepare("INSERT INTO admin_vault (title, item_type, link, username, secret_value) VALUES (?, ?, ?, ?, ?)")
+                        ->execute([$input['title'], $input['item_type'], $input['link'] ?? null, $input['username'] ?? null, $input['secret_value'] ?? null]);
+                }
+                echo json_encode(['success' => true]);
+            } elseif ($method === 'DELETE' && $id) {
+                $pdo->prepare("DELETE FROM admin_vault WHERE id = ?")->execute([$id]);
+                echo json_encode(['success' => true]);
+            }
+            break;
+
         default:
             http_response_code(404);
             echo json_encode(['error' => "Endpoint nao encontrado: " . htmlspecialchars($res)]);

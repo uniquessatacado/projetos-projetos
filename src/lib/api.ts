@@ -56,3 +56,9 @@ export const deleteKnowledgeBaseItem = (id: number): Promise<void> => request(`/
 // Configurações
 export const getSettings = async (): Promise<Setting[]> => extractList(await request<any>('/configuracoes'));
 export const saveSetting = (data: any): Promise<void> => request('/configuracoes', { method: 'POST', body: JSON.stringify(data) });
+
+// Admin Vault
+export const getAdminVaultItems = async (): Promise<any[]> => extractList(await request<any>('/admin_vault'));
+export const createAdminVaultItem = (data: any): Promise<any> => request('/admin_vault', { method: 'POST', body: JSON.stringify(data) });
+export const updateAdminVaultItem = (id: number, data: any): Promise<void> => request(`/admin_vault/${id}`, { method: 'POST', body: JSON.stringify(data) });
+export const deleteAdminVaultItem = (id: number): Promise<void> => request(`/admin_vault/${id}`, { method: 'DELETE' });
