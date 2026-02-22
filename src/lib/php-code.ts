@@ -38,32 +38,32 @@ function getPdo() {
 }
 
 function initTables($pdo) {
-    // Projetos - Esquema Estático
+    // Projetos
     $pdo->exec("CREATE TABLE IF NOT EXISTS projetos (
         id INT AUTO_INCREMENT PRIMARY KEY,
         nome VARCHAR(255) NOT NULL,
         cliente_nome VARCHAR(255) NOT NULL,
-        descricao TEXT,
+        descricao LONGTEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB");
 
-    // Funcionalidades - Esquema Estático
+    // Funcionalidades
     $pdo->exec("CREATE TABLE IF NOT EXISTS funcionalidades (
         id INT AUTO_INCREMENT PRIMARY KEY,
         projeto_id INT NOT NULL,
         titulo VARCHAR(255) NOT NULL,
-        descricao TEXT,
+        descricao LONGTEXT,
         complexidade VARCHAR(50) NOT NULL,
         categoria VARCHAR(100),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (projeto_id) REFERENCES projetos(id) ON DELETE CASCADE
     ) ENGINE=InnoDB");
 
-    // Templates
+    // Templates / Base de Conhecimento
     $pdo->exec("CREATE TABLE IF NOT EXISTS templates (
         id INT AUTO_INCREMENT PRIMARY KEY,
         nome VARCHAR(255) NOT NULL,
-        descricao TEXT,
+        descricao LONGTEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB");
 
@@ -78,7 +78,7 @@ function initTables($pdo) {
 
 $path = isset($_GET['path']) ? $_GET['path'] : '';
 $method = $_SERVER['REQUEST_METHOD'];
-$parts = explode('/', $path);
+$parts = explode('/', trim($path, '/'));
 $res = $parts[0];
 $id = $parts[1] ?? null;
 $input = json_decode(file_get_contents('php://input'), true);
@@ -101,11 +101,15 @@ try {
                 if ($id) {
                     $stmt = $pdo->prepare("UPDATE projetos SET nome = ?, cliente_nome = ?, descricao = ? WHERE id = ?");
                     $stmt->execute([$input['nome'], $input['cliente_nome'], $input['descricao'] ?? '', $id]);
+                    echo json_encode(['success' => true]);
                 } else {
                     $stmt = $pdo->prepare("INSERT INTO projetos (nome, cliente_nome, descricao) VALUES (?, ?, ?)");
                     $stmt->execute([$input['nome'], $input['cliente_nome'], $input['descricao'] ?? '']);
                     echo json_encode(['id' => $pdo->lastInsertId()]);
                 }
+            } elseif ($method === 'DELETE' && $id) {
+                $pdo->prepare("DELETE FROM projetos WHERE id = ?")->execute([$id]);
+                echo json_encode(['success' => true]);
             }
             break;
 
@@ -119,6 +123,7 @@ try {
                 if ($id) {
                     $stmt = $pdo->prepare("UPDATE funcionalidades SET titulo = ?, descricao = ?, complexidade = ?, categoria = ? WHERE id = ?");
                     $stmt->execute([$input['titulo'], $input['descricao'] ?? '', $input['complexidade'], $input['categoria'] ?? '', $id]);
+                    echo json_encode(['success' => true]);
                 } else {
                     $stmt = $pdo->prepare("INSERT INTO funcionalidades (projeto_id, titulo, descricao, complexidade, categoria) VALUES (?, ?, ?, ?, ?)");
                     $stmt->execute([$input['projeto_id'], $input['titulo'], $input['descricao'] ?? '', $input['complexidade'], $input['categoria'] ?? '']);
@@ -134,8 +139,15 @@ try {
             if ($method === 'GET') {
                 echo json_encode($pdo->query("SELECT * FROM templates ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC));
             } elseif ($method === 'POST') {
-                $pdo->prepare("INSERT INTO templates (nome, descricao) VALUES (?, ?)")->execute([$input['nome'], $input['descricao'] ?? '']);
-                echo json_encode(['id' => $pdo->lastInsertId()]);
+                if ($id) {
+                    $pdo->prepare("UPDATE templates SET nome = ?, descricao = ? WHERE id = ?")->execute([$input['nome'], $input['descricao'] ?? '', $id]);
+                } else {
+                    $pdo->prepare("INSERT INTO templates (nome, descricao) VALUES (?, ?)")->execute([$input['nome'], $input['descricao'] ?? '']);
+                }
+                echo json_encode(['success' => true]);
+            } elseif ($method === 'DELETE' && $id) {
+                $pdo->prepare("DELETE FROM templates WHERE id = ?")->execute([$id]);
+                echo json_encode(['success' => true]);
             }
             break;
 
