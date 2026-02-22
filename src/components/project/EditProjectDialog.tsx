@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { showError, showSuccess } from '@/utils/toast';
 import { Project } from '@/types';
 import { parseMetadata, getCleanDescription, stringifyMetadata } from '@/lib/meta-utils';
-import { CircleDollarSign, UserPlus } from 'lucide-react';
+import { CircleDollarSign, UserPlus, HardDrive, Globe } from 'lucide-react';
 
 const projectSchema = z.object({
   nome: z.string().min(3),
@@ -30,6 +30,9 @@ const projectSchema = z.object({
   comissao_tipo: z.string().optional(),
   comissao_valor_base: z.string().optional(),
   comissao_pagamento: z.string().optional(),
+  has_server: z.string().optional(),
+  vps_plan: z.string().optional(),
+  has_domain: z.string().optional(),
 });
 
 type ProjectFormData = z.infer<typeof projectSchema>;
@@ -49,6 +52,7 @@ export const EditProjectDialog = ({ project, open, onOpenChange }: EditProjectDi
   });
 
   const formaPagamento = watch('forma_pagamento');
+  const hasServer = watch('has_server');
 
   useEffect(() => {
     if (open) {
@@ -65,6 +69,9 @@ export const EditProjectDialog = ({ project, open, onOpenChange }: EditProjectDi
         comissao_tipo: meta.comissao_tipo || 'fixo',
         comissao_valor_base: meta.comissao_valor_base || '',
         comissao_pagamento: meta.comissao_pagamento || 'unico',
+        has_server: meta.has_server || '',
+        vps_plan: meta.vps_plan || '',
+        has_domain: meta.has_domain || '',
       });
     }
   }, [open, project, reset]);
@@ -107,6 +114,40 @@ export const EditProjectDialog = ({ project, open, onOpenChange }: EditProjectDi
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1"><Label>Projeto</Label><Input {...register('nome')} /></div>
                 <div className="space-y-1"><Label>Cliente</Label><Input {...register('cliente_nome')} /></div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-xl space-y-4">
+                <Label className="flex items-center gap-2"><HardDrive className="w-4 h-4 text-indigo-500" /> Infraestrutura</Label>
+                <div className="grid grid-cols-2 gap-4">
+                    <Select onValueChange={(v) => setValue('has_server', v)} defaultValue={meta.has_server}>
+                        <SelectTrigger><SelectValue placeholder="Terá Servidor?" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="yes">Sim, precisa de VPS</SelectItem>
+                            <SelectItem value="no">Não (Cliente já tem / Outro)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    {hasServer === 'yes' && (
+                        <Select onValueChange={(v) => setValue('vps_plan', v)} defaultValue={meta.vps_plan}>
+                            <SelectTrigger><SelectValue placeholder="Escolha o Plano" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="basic">$3.49 (4 vCPU / 8GB)</SelectItem>
+                                <SelectItem value="popular">$6.49 (6 vCPU / 12GB)</SelectItem>
+                                <SelectItem value="pro">$10.49 (8 vCPU / 24GB)</SelectItem>
+                                <SelectItem value="elite">$17.49 (10 vCPU / 32GB)</SelectItem>
+                                <SelectItem value="maximum">$27.49 (16 vCPU / 64GB)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    )}
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                    <Select onValueChange={(v) => setValue('has_domain', v)} defaultValue={meta.has_domain}>
+                        <SelectTrigger><SelectValue placeholder="Terá Domínio?" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="yes">Sim (+ R$ 60,00/ano)</SelectItem>
+                            <SelectItem value="no">Não (Já possui)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             <div className="p-4 bg-slate-50 rounded-xl space-y-4">

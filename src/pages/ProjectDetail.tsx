@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Play, Pause, CheckCircle, Clock, Calendar, ListTodo, MoreHorizontal, Edit, Trash2, Phone, User, UserPlus } from 'lucide-react';
+import { ArrowLeft, Play, Pause, CheckCircle, Clock, Calendar, ListTodo, MoreHorizontal, Edit, Trash2, Phone, User, UserPlus, Shield } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { Feature } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
@@ -16,6 +16,8 @@ import { ptBR } from 'date-fns/locale';
 import { NewFeatureDialog } from '@/components/project/NewFeatureDialog';
 import { WorkflowGuide } from '@/components/project/WorkflowGuide';
 import { FinancialInfoCard } from '@/components/project/FinancialInfoCard';
+import { ProjectInfrastructureCard } from '@/components/project/ProjectInfrastructureCard';
+import { ProjectVault } from '@/components/project/ProjectVault';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { parseMetadata, stringifyMetadata, getCleanDescription } from '@/lib/meta-utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -222,10 +224,13 @@ const ProjectDetail = () => {
                     </div>
                 </CardContent>
             </Card>
+
+            <ProjectVault project={project} />
         </div>
 
         <aside className="space-y-6">
             <FinancialInfoCard descricao={project?.descricao} />
+            <ProjectInfrastructureCard descricao={project?.descricao} />
             {projectMeta.indicacao_nome && (
                 <Card className="border-amber-100 bg-amber-50/30">
                     <CardHeader className="pb-2">
@@ -247,7 +252,7 @@ const ProjectDetail = () => {
                     </CardContent>
                 </Card>
             )}
-            <WorkflowGuide />
+            <WorkflowGuide project={project!} />
         </aside>
       </div>
 
