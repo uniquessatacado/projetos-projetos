@@ -1,11 +1,10 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, Link } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import SidebarContent from "@/components/layout/Sidebar";
 import NavButton from "@/components/layout/NavButton";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Menu } from "lucide-react";
+import { Menu, Home } from "lucide-react";
 
 const AppLayout = () => {
     const isMobile = useIsMobile();
@@ -27,21 +26,23 @@ const AppLayout = () => {
                 <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
                     <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50 px-2 py-2">
                         <div className="flex justify-around items-center">
-                            <NavButton icon="Home" label="Projetos" to="/" />
                             <NavButton icon="Users" label="Clientes" to="/clientes" />
+                            <NavButton icon="Shield" label="Cofre" to="/cofre" />
                             
+                            <Link 
+                                to="/"
+                                className="w-16 h-16 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-glow transform -translate-y-4 flex flex-col gap-1 items-center justify-center"
+                            >
+                                <Home className="w-6 h-6" />
+                                <span className="text-xs font-medium">Projetos</span>
+                            </Link>
+
                             <SheetTrigger asChild>
-                                <Button 
-                                    variant="default" 
-                                    size="icon" 
-                                    className="w-16 h-16 rounded-2xl bg-indigo-600 hover:bg-indigo-700 shadow-glow transform -translate-y-4 flex flex-col gap-1"
-                                >
+                                <button className="flex flex-col items-center justify-center gap-1 w-20 h-16 rounded-lg transition-colors text-gray-500 hover:text-primary-600">
                                     <Menu className="w-6 h-6" />
                                     <span className="text-xs font-medium">Menu</span>
-                                </Button>
+                                </button>
                             </SheetTrigger>
-
-                            <NavButton icon="Shield" label="Cofre" to="/cofre" />
                             <NavButton icon="Settings" label="Config" to="/configuracoes" />
                         </div>
                     </nav>
