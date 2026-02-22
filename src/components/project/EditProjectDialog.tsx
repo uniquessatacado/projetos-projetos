@@ -15,57 +15,56 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { showError, showSuccess } from '@/utils/toast';
 import { Project } from '@/types';
 import { parseMetadata, getCleanDescription, stringifyMetadata } from '@/lib/meta-utils';
-import { CircleDollarSign } from 'lucide-react';
+import { CircleDollarSign, UserPlus } from 'lucide-react';
 
 const projectSchema = z.object({
-  nome: z.string().min(3, { message: 'O nome é obrigatório.' }),
-  cliente_nome: z.string().min(3, { message: 'O cliente é obrigatório.' }),
+  nome: z.string().min(3),
+  cliente_nome: z.string().min(3),
   descricao_limpa: z.string().optional(),
   prazo_entrega: z.string().optional(),
   valor_fechado: z.string().optional(),
   forma_pagamento: z.string().optional(),
-  indicacao: z.string().optional(),
-  comissao_valor: z.string().optional(),
+  projeto_parcelas: z.string().optional(),
+  indicacao_nome: z.string().optional(),
+  indicacao_whatsapp: z.string().optional(),
+  comissao_tipo: z.string().optional(),
+  comissao_valor_base: z.string().optional(),
+  comissao_pagamento: z.string().optional(),
 });
 
 type ProjectFormData = z.infer<typeof projectSchema>;
 
 interface EditProjectDialogProps {
-  project: Project;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+    project: Project;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
 }
 
 export const EditProjectDialog = ({ project, open, onOpenChange }: EditProjectDialogProps) => {
   const queryClient = useQueryClient();
   const meta = parseMetadata<any>(project.descricao);
 
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<ProjectFormData>({
+  const { register, handleSubmit, reset, setValue, watch } = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
-    defaultValues: {
-      nome: project.nome,
-      cliente_nome: project.cliente_nome,
-      descricao_limpa: getCleanDescription(project.descricao),
-      prazo_entrega: meta.prazo_entrega || '',
-      valor_fechado: meta.valor_fechado || '',
-      forma_pagamento: meta.forma_pagamento || 'a_vista',
-      indicacao: meta.indicacao || '',
-      comissao_valor: meta.comissao_valor || '',
-    }
   });
+
+  const formaPagamento = watch('forma_pagamento');
 
   useEffect(() => {
     if (open) {
-      const currentMeta = parseMetadata<any>(project.descricao);
       reset({
         nome: project.nome,
         cliente_nome: project.cliente_nome,
         descricao_limpa: getCleanDescription(project.descricao),
-        prazo_entrega: currentMeta.prazo_entrega || '',
-        valor_fechado: currentMeta.valor_fechado || '',
-        forma_pagamento: currentMeta.forma_pagamento || 'a_vista',
-        indicacao: currentMeta.indicacao || '',
-        comissao_valor: currentMeta.comissao_valor || '',
+        prazo_entrega: meta.prazo_entrega || '',
+        valor_fechado: meta.valor_fechado || '',
+        forma_pagamento: meta.forma_pagamento || 'a_vista',
+        projeto_parcelas: meta.projeto_parcelas || '1',
+        indicacao_nome: meta.indicacao_nome || '',
+        indicacao_whatsapp: meta.indicacao_whatsapp || '',
+        comissao_tipo: meta.comissao_tipo || 'fixo',
+        comissao_valor_base: meta.comissao_valor_base || '',
+        comissao_pagamento: meta.comissao_pagamento || 'unico',
       });
     }
   }, [open, project, reset]);
@@ -74,13 +73,14 @@ export const EditProjectDialog = ({ project, open, onOpenChange }: EditProjectDi
     mutationFn: (data: ProjectFormData) => {
       const updatedMeta = { 
         ...meta, 
-        prazo_entrega: data.prazo_entrega,
-        valor_fechado: data.valor_fechado,
-        forma_pagamento: data.forma_pagamento,
-        indicacao: data.indicacao,
-        comissao_valor: data.comissao_valor
+        ...data,
       };
-      const updatedDesc = stringifyMetadata(data.descricao_limpa || '', updatedMeta);
+      // A descrição limpa não vai para o JSON, ela é a base do texto
+      const cleanDesc = data.descricao_limpa || '';
+      const { descricao_limpa, ...metaWithoutDesc } = updatedMeta;
+      
+      const updatedDesc = stringifyMetadata(cleanDesc, metaWithoutDesc);
+      
       return updateProject(project.id, { 
         nome: data.nome, 
         cliente_nome: data.cliente_nome, 
@@ -88,7 +88,7 @@ export const EditProjectDialog = ({ project, open, onOpenChange }: EditProjectDi
       });
     },
     onSuccess: () => {
-      showSuccess('Projeto atualizado!');
+      showSuccess('Dados atualizados!');
       queryClient.invalidateQueries({ queryKey: ['project', project.id.toString()] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       onOpenChange(false);
@@ -98,57 +98,59 @@ export const EditProjectDialog = ({ project, open, onOpenChange }: EditProjectDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editar Projeto</DialogTitle>
-          <DialogDescription>Atualize os dados e negociação.</DialogDescription>
+          <DialogTitle>Editar Negociação</DialogTitle>
+          <DialogDescription>Atualize os valores e a inteligência de comissão.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-5 pt-2">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Nome do Projeto</Label>
-              <Input {...register('nome')} />
+        <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1"><Label>Projeto</Label><Input {...register('nome')} /></div>
+                <div className="space-y-1"><Label>Cliente</Label><Input {...register('cliente_nome')} /></div>
             </div>
-            <div className="space-y-2">
-              <Label>Cliente</Label>
-              <Input {...register('cliente_nome')} />
+
+            <div className="p-4 bg-slate-50 rounded-xl space-y-4">
+                <Label className="flex items-center gap-2"><CircleDollarSign className="w-4 h-4" /> Pagamento</Label>
+                <div className="grid grid-cols-3 gap-4">
+                    <Input type="number" step="0.01" {...register('valor_fechado')} placeholder="Total" />
+                    <Select onValueChange={(v) => setValue('forma_pagamento', v)} defaultValue={meta.forma_pagamento || 'a_vista'}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="a_vista">À Vista</SelectItem>
+                            <SelectItem value="parcelado">Parcelado</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    {formaPagamento === 'parcelado' && <Input type="number" {...register('projeto_parcelas')} />}
+                </div>
             </div>
-          </div>
 
-          <div className="p-4 bg-indigo-50/30 rounded-xl border border-indigo-100 space-y-4">
-             <div className="flex items-center gap-2 text-indigo-700 font-bold text-sm">
-                <CircleDollarSign className="w-4 h-4" /> Gestão Comercial
-             </div>
-             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label>Valor do Contrato</Label>
-                    <Input type="number" step="0.01" {...register('valor_fechado')} />
+            <div className="p-4 bg-amber-50 rounded-xl space-y-4">
+                <Label className="flex items-center gap-2"><UserPlus className="w-4 h-4" /> Comissão Parceiro</Label>
+                <div className="grid grid-cols-2 gap-4">
+                    <Input {...register('indicacao_nome')} placeholder="Nome Parceiro" />
+                    <Input {...register('indicacao_whatsapp')} placeholder="WhatsApp" />
                 </div>
-                <div className="space-y-2">
-                    <Label>Prazo de Entrega</Label>
-                    <Input type="date" {...register('prazo_entrega')} />
+                <div className="grid grid-cols-3 gap-4">
+                    <Select onValueChange={(v:any) => setValue('comissao_tipo', v)} defaultValue={meta.comissao_tipo || 'fixo'}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="fixo">Fixo</SelectItem>
+                            <SelectItem value="porcentagem">%</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Input type="number" step="0.01" {...register('comissao_valor_base')} />
+                    <Select onValueChange={(v:any) => setValue('comissao_pagamento', v)} defaultValue={meta.comissao_pagamento || 'unico'}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="unico">Integral</SelectItem>
+                            <SelectItem value="proporcional">Proporcional</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
-             </div>
-             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label>Indicação</Label>
-                    <Input {...register('indicacao')} />
-                </div>
-                <div className="space-y-2">
-                    <Label>Comissão Parceiro</Label>
-                    <Input type="number" step="0.01" {...register('comissao_valor')} />
-                </div>
-             </div>
-          </div>
+            </div>
 
-          <div className="space-y-2">
-            <Label>Notas do Escopo</Label>
-            <Textarea {...register('descricao_limpa')} rows={3} />
-          </div>
-          
-          <DialogFooter>
-            <Button type="submit" className="bg-indigo-600" disabled={mutation.isPending}>Salvar Alterações</Button>
-          </DialogFooter>
+            <div className="space-y-1"><Label>Notas</Label><Textarea {...register('descricao_limpa')} /></div>
+            <DialogFooter><Button type="submit">Salvar Alterações</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
