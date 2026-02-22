@@ -1,4 +1,4 @@
-import { Home, PlusCircle, Settings } from 'lucide-react';
+import { Home, PlusCircle, Settings, Shield, Users } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -6,6 +6,8 @@ const icons = {
   Home,
   PlusCircle,
   Settings,
+  Shield,
+  Users,
 };
 
 interface NavButtonProps {
