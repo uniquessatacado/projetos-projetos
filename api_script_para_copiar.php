@@ -15,10 +15,11 @@ if (!extension_loaded('pdo_mysql')) {
     exit;
 }
 
-$host = '172.22.0.2';
-$db   = 'projetos'; 
-$user = 'root';
-$pass = 'root123'; 
+// Use environment variables with fallbacks for database connection
+$host = getenv('DB_HOST') ?: '172.22.0.2';
+$db   = getenv('DB_NAME') ?: 'projetos';
+$user = getenv('DB_USER') ?: 'root';
+$pass = getenv('DB_PASS') ?: 'root123';
 
 try {
     $pdo = new PDO("mysql:host=$host;charset=utf8", $user, $pass);
