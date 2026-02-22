@@ -41,6 +41,8 @@ export const createProject = (data: any): Promise<Project> => request('/projetos
 
 export const updateProject = (id: number, data: Partial<Project>): Promise<void> => request(`/projetos/${id}`, { method: 'POST', body: JSON.stringify(data) });
 
+export const deleteProject = (id: number): Promise<void> => request(`/projetos/${id}`, { method: 'DELETE' });
+
 export const getFeaturesByProjectId = async (projectId: number): Promise<Feature[]> => {
   const response = await request<PaginatedResponse<Feature> | Feature[]>(`/funcionalidades?projeto_id=${projectId}`);
   return extractList(response);

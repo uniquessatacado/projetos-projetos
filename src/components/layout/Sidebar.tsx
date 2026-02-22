@@ -1,4 +1,4 @@
-import { Home, Settings, FolderKanban } from 'lucide-react';
+import { Home, Settings, FolderKanban, Users } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,10 @@ const SidebarContent = () => {
           <Home className="w-5 h-5" />
           <span>Projetos</span>
         </NavLink>
+        <NavLink to="/clientes" className={linkClasses}>
+          <Users className="w-5 h-5" />
+          <span>Clientes</span>
+        </NavLink>
         <NavLink to="/templates" className={linkClasses}>
           <FolderKanban className="w-5 h-5" />
           <span>Templates</span>
@@ -32,7 +36,7 @@ const SidebarContent = () => {
         </NavLink>
       </nav>
       <div className="mt-auto">
-        <p className="text-xs text-gray-400">Versão 2.1.0</p>
+        <p className="text-xs text-gray-400">Versão 2.2.0</p>
       </div>
     </div>
   );

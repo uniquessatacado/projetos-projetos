@@ -2,13 +2,13 @@
 
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getProjectById, getFeaturesByProjectId, updateProject, updateFeature, deleteFeature } from '@/lib/api';
+import { getProjectById, getFeaturesByProjectId, updateProject, updateFeature, deleteFeature, deleteProject } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Play, Pause, CheckCircle, Clock, Calendar, ListTodo, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Play, Pause, CheckCircle, Clock, Calendar, ListTodo, MoreHorizontal, Edit, Trash2, Phone, User, UserPlus } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { Feature } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
@@ -42,13 +42,7 @@ const ProjectDetail = () => {
     enabled: !!project,
   });
 
-  const projectMeta = parseMetadata<{ 
-    status?: string, 
-    started_at?: string, 
-    paused_at?: string,
-    prazo_entrega?: string 
-  }>(project?.descricao);
-  
+  const projectMeta = parseMetadata<any>(project?.descricao);
   const currentProjectStatus = projectMeta.status || 'aguardando_inicio';
 
   const updateProjectMutation = useMutation({
@@ -63,12 +57,13 @@ const ProjectDetail = () => {
     }
   });
 
-  const deleteFeatureMutation = useMutation({
-    mutationFn: deleteFeature,
+  const deleteProjectMutation = useMutation({
+    mutationFn: () => deleteProject(project!.id),
     onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['features', project?.id] });
-        showSuccess('Removido com sucesso!');
-    }
+        showSuccess('Projeto excluído permanentemente!');
+        navigate('/');
+    },
+    onError: (e: any) => showError(e.message)
   });
 
   const toggleFeatureStatus = useMutation({
@@ -83,94 +78,67 @@ const ProjectDetail = () => {
     }
   });
 
-  const getFeatureData = (f: Feature) => {
-    const meta = parseMetadata<{ status?: string, observacoes?: string }>(f.descricao);
-    return {
-        status: meta.status || 'pendente',
-        observacoes: meta.observacoes || '',
-        cleanDesc: getCleanDescription(f.descricao)
-    };
+  const openWhatsApp = (phone: string) => {
+    if (!phone) return;
+    const cleanPhone = phone.replace(/\D/g, "");
+    window.open(`https://wa.me/55${cleanPhone}`, "_blank");
   };
 
   const calculateProgress = () => {
     if (!features || features.length === 0) return 0;
-    const completed = features.filter(f => getFeatureData(f).status === 'concluido').length;
+    const completed = features.filter(f => {
+        const meta = parseMetadata<any>(f.descricao);
+        return (meta.status || 'pendente') === 'concluido';
+    }).length;
     return Math.round((completed / features.length) * 100);
   };
 
   if (isLoadingProject || isLoadingFeatures) return <div className="p-8"><Skeleton className="h-96 w-full" /></div>;
-
-  const renderFeatureList = (filterStatus?: string) => {
-    const filtered = filterStatus 
-        ? features?.filter(f => getFeatureData(f).status === filterStatus)
-        : features;
-
-    if (!filtered || filtered.length === 0) return <p className="text-center py-8 text-slate-400">Vazio.</p>;
-
-    return filtered.map((f) => {
-        const data = getFeatureData(f);
-        return (
-            <div key={f.id} className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-100 hover:shadow-soft transition-all">
-                <div className="flex items-center gap-4">
-                    <div className={`p-2 rounded-full ${data.status === 'concluido' ? 'bg-green-100 text-green-600' : data.status === 'fazendo' ? 'bg-amber-100 text-amber-600 animate-pulse' : 'bg-slate-100 text-slate-400'}`}>
-                        <ListTodo className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <h4 className={`font-bold ${data.status === 'concluido' ? 'text-slate-400 line-through' : ''}`}>{f.titulo}</h4>
-                        <p className="text-xs text-slate-500">{f.complexidade.toUpperCase()}</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <select 
-                        value={data.status} 
-                        onChange={(e) => toggleFeatureStatus.mutate({ feature: f, status: e.target.value })}
-                        className="text-xs font-bold border rounded p-1.5 bg-slate-50 border-slate-200 outline-none"
-                    >
-                        <option value="pendente">FILA</option>
-                        <option value="fazendo">FAZENDO</option>
-                        <option value="concluido">PRONTO</option>
-                    </select>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="w-4" /></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => setEditingFeature(f)}><Edit className="w-4 mr-2" /> Editar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-500" onClick={() => deleteFeatureMutation.mutate(f.id)}><Trash2 className="w-4 mr-2" /> Excluir</DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            </div>
-        );
-    });
-  };
 
   return (
     <div className="p-4 lg:p-8 animate-fade-in max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <Button variant="ghost" onClick={() => navigate('/')}><ArrowLeft className="w-4 mr-2" /> Voltar</Button>
         <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsEditProjectOpen(true)}><Edit className="w-4 mr-2" /> Configurações</Button>
-            
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline"><MoreHorizontal className="w-4 mr-2" /> Ações do Projeto</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => setIsEditProjectOpen(true)}><Edit className="w-4 mr-2" /> Editar Dados</DropdownMenuItem>
+                    <DropdownMenuItem className="text-red-500" onClick={() => {
+                        if(confirm('Tem certeza? Isso apagará todos os dados deste projeto.')) deleteProjectMutation.mutate();
+                    }}><Trash2 className="w-4 mr-2" /> Excluir Projeto</DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+
             {currentProjectStatus === 'aguardando_inicio' && (
-                <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-glow" onClick={() => updateProjectMutation.mutate({ status: 'em_andamento', started_at: new Date().toISOString() })}>
+                <Button className="bg-indigo-600" onClick={() => updateProjectMutation.mutate({ status: 'em_andamento', started_at: new Date().toISOString() })}>
                     <Play className="w-4 mr-2" /> Iniciar Projeto
                 </Button>
             )}
 
             {currentProjectStatus === 'em_andamento' && (
-                <Button variant="outline" className="border-amber-200 text-amber-600 hover:bg-amber-50" onClick={() => updateProjectMutation.mutate({ status: 'pausado', paused_at: new Date().toISOString() })}>
+                <Button variant="outline" className="border-amber-200 text-amber-600" onClick={() => updateProjectMutation.mutate({ status: 'pausado', paused_at: new Date().toISOString() })}>
                     <Pause className="w-4 mr-2" /> Pausar
                 </Button>
             )}
 
             {currentProjectStatus === 'pausado' && (
                 <Button className="bg-indigo-600" onClick={() => updateProjectMutation.mutate({ status: 'em_andamento', started_at: new Date().toISOString(), paused_at: null })}>
-                    <Play className="w-4 mr-2" /> Retomar Atividade
+                    <Play className="w-4 mr-2" /> Retomar
                 </Button>
             )}
 
+            {(currentProjectStatus === 'em_andamento' || currentProjectStatus === 'pausado') && calculateProgress() === 100 && (
+                 <Button className="bg-emerald-600" onClick={() => updateProjectMutation.mutate({ status: 'concluido', finished_at: new Date().toISOString() })}>
+                    <CheckCircle className="w-4 mr-2" /> Finalizar Entrega
+                 </Button>
+            )}
+
             {currentProjectStatus === 'concluido' && (
-                <Button variant="secondary" onClick={() => updateProjectMutation.mutate({ status: 'aguardando_inicio', started_at: null, paused_at: null })}>
-                    Reiniciar Escopo
+                <Button variant="outline" onClick={() => updateProjectMutation.mutate({ status: 'em_andamento' })}>
+                    Retomar para Ajustes
                 </Button>
             )}
         </div>
@@ -178,15 +146,27 @@ const ProjectDetail = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-3">
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight">{project?.nome}</h1>
-                    <Badge className={`font-black shadow-sm ${currentProjectStatus === 'em_andamento' ? 'bg-indigo-500 hover:bg-indigo-600' : currentProjectStatus === 'pausado' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-slate-500'}`}>
-                        {currentProjectStatus.replace('_', ' ').toUpperCase()}
+                    <Badge className={`font-black ${currentProjectStatus === 'concluido' ? 'bg-emerald-500' : currentProjectStatus === 'em_andamento' ? 'bg-indigo-500' : 'bg-slate-500'}`}>
+                        {currentProjectStatus.toUpperCase()}
                     </Badge>
                 </div>
-                <div className="flex items-center gap-4 text-slate-500 font-bold text-sm">
-                    <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-indigo-400" /> {project?.cliente_nome}</span>
+                <div className="flex flex-wrap items-center gap-4 text-slate-500 font-bold text-sm">
+                    <span className="flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 rounded-full">
+                        <User className="w-4 h-4 text-indigo-400" /> {project?.cliente_nome}
+                    </span>
+                    {projectMeta.cliente_whatsapp && (
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50 p-0 h-auto"
+                            onClick={() => openWhatsApp(projectMeta.cliente_whatsapp)}
+                        >
+                            <Phone className="w-4 h-4 mr-1.5" /> Falar com Cliente
+                        </Button>
+                    )}
                     <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-indigo-400" /> Prazo: {projectMeta.prazo_entrega || 'Não definido'}</span>
                 </div>
             </div>
@@ -194,51 +174,79 @@ const ProjectDetail = () => {
             <Card className="shadow-card border-none overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between border-b bg-slate-50/50 p-6">
                     <div>
-                        <CardTitle className="text-xl">Funcionalidades do Escopo</CardTitle>
-                        <CardDescription>Gerenciamento técnico das entregas.</CardDescription>
+                        <CardTitle className="text-xl">
+                            {currentProjectStatus === 'concluido' ? 'Fase de Ajustes / Adicionais' : 'Funcionalidades do Escopo'}
+                        </CardTitle>
+                        <CardDescription>
+                            {currentProjectStatus === 'concluido' 
+                                ? 'Projeto finalizado. Você ainda pode adicionar ajustes cobrados à parte.' 
+                                : 'Gerenciamento técnico das entregas.'}
+                        </CardDescription>
                     </div>
                     <NewFeatureDialog projectId={project!.id}>
-                        <Button size="sm" className="bg-indigo-600">Nova Função</Button>
+                        <Button size="sm" className="bg-indigo-600">
+                            {currentProjectStatus === 'concluido' ? '+ Novo Ajuste' : '+ Nova Função'}
+                        </Button>
                     </NewFeatureDialog>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <Tabs defaultValue="todas">
-                        <TabsList className="w-full justify-start rounded-none px-6 border-b bg-transparent h-12">
-                            <TabsTrigger value="todas" className="h-12 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 bg-transparent">Todas</TabsTrigger>
-                            <TabsTrigger value="fila" className="h-12 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 bg-transparent">Aguardando</TabsTrigger>
-                            <TabsTrigger value="fazendo" className="h-12 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 bg-transparent">Em Produção</TabsTrigger>
-                        </TabsList>
-                        <div className="p-6 space-y-3">
-                            <TabsContent value="todas" className="mt-0">{renderFeatureList()}</TabsContent>
-                            <TabsContent value="fila" className="mt-0">{renderFeatureList('pendente')}</TabsContent>
-                            <TabsContent value="fazendo" className="mt-0">{renderFeatureList('fazendo')}</TabsContent>
-                        </div>
-                    </Tabs>
+                    <div className="p-6 space-y-3">
+                        {features?.map(f => {
+                            const meta = parseMetadata<any>(f.descricao);
+                            const status = meta.status || 'pendente';
+                            return (
+                                <div key={f.id} className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-100">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-2 rounded-full ${status === 'concluido' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
+                                            <ListTodo className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold">{f.titulo}</h4>
+                                            <p className="text-[10px] text-slate-400 uppercase font-black">{f.complexidade}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <select 
+                                            value={status} 
+                                            onChange={(e) => toggleFeatureStatus.mutate({ feature: f, status: e.target.value })}
+                                            className="text-xs font-bold border rounded p-1.5 bg-slate-50 border-slate-200"
+                                        >
+                                            <option value="pendente">FILA</option>
+                                            <option value="fazendo">FAZENDO</option>
+                                            <option value="concluido">PRONTO</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </CardContent>
             </Card>
         </div>
 
         <aside className="space-y-6">
             <FinancialInfoCard descricao={project?.descricao} />
-            <Card className="bg-indigo-600 text-white border-none shadow-glow overflow-hidden relative">
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <Clock className="w-24 h-24" />
-                </div>
-                <CardHeader>
-                    <CardTitle className="text-indigo-100 text-sm font-black uppercase tracking-widest">Progresso Real</CardTitle>
-                    <div className="text-5xl font-black">{calculateProgress()}%</div>
-                </CardHeader>
-                <CardContent>
-                    <Progress value={calculateProgress()} className="bg-white/20 h-2 mb-4" />
-                    <div className="space-y-2">
-                        {projectMeta.started_at && (
-                            <div className="flex items-center gap-2 text-xs font-bold bg-white/10 p-2 rounded-lg">
-                                <Clock className="w-4 h-4" /> Ativo há {getElapsedTime(projectMeta.started_at)}
-                            </div>
+            {projectMeta.indicacao_nome && (
+                <Card className="border-amber-100 bg-amber-50/30">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-black text-amber-800 uppercase flex items-center gap-2">
+                            <UserPlus className="w-4 h-4" /> Indicação
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm font-bold text-slate-700">{projectMeta.indicacao_nome}</p>
+                        {projectMeta.indicacao_whatsapp && (
+                             <Button 
+                                variant="link" 
+                                className="p-0 h-auto text-xs text-green-600 font-black mt-2"
+                                onClick={() => openWhatsApp(projectMeta.indicacao_whatsapp)}
+                             >
+                                <Phone className="w-3 h-3 mr-1" /> WhatsApp Parceiro
+                             </Button>
                         )}
-                    </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            )}
             <WorkflowGuide />
         </aside>
       </div>

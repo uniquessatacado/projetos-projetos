@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, CircleDollarSign, UserPlus } from 'lucide-react';
+import { PlusCircle, CircleDollarSign, UserPlus, Phone } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { Project } from '@/types';
 import { stringifyMetadata } from '@/lib/meta-utils';
@@ -20,10 +20,12 @@ import { stringifyMetadata } from '@/lib/meta-utils';
 const projectSchema = z.object({
   nome: z.string().min(3, { message: 'O nome do projeto é obrigatório.' }),
   cliente_nome: z.string().min(3, { message: 'O nome do cliente é obrigatório.' }),
+  cliente_whatsapp: z.string().optional(),
   descricao: z.string().optional(),
   valor_fechado: z.string().optional(),
   forma_pagamento: z.string().optional(),
-  indicacao: z.string().optional(),
+  indicacao_nome: z.string().optional(),
+  indicacao_whatsapp: z.string().optional(),
   comissao_valor: z.string().optional(),
 });
 
@@ -45,7 +47,9 @@ export const NewProjectDialog = () => {
       const metadata = {
         valor_fechado: data.valor_fechado,
         forma_pagamento: data.forma_pagamento,
-        indicacao: data.indicacao,
+        indicacao_nome: data.indicacao_nome,
+        indicacao_whatsapp: data.indicacao_whatsapp,
+        cliente_whatsapp: data.cliente_whatsapp,
         comissao_valor: data.comissao_valor,
         status: 'aguardando_inicio'
       };
@@ -77,7 +81,7 @@ export const NewProjectDialog = () => {
           Novo Projeto
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo Escopo Comercial</DialogTitle>
           <DialogDescription>
@@ -93,8 +97,12 @@ export const NewProjectDialog = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="cliente_nome">Cliente</Label>
-              <Input id="cliente_nome" {...register('cliente_nome')} placeholder="Empresa ou Pessoa" />
+              <Input id="cliente_nome" {...register('cliente_nome')} placeholder="Nome do Cliente" />
               {errors.cliente_nome && <p className="text-red-500 text-xs">{errors.cliente_nome.message}</p>}
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label className="flex items-center gap-1"><Phone className="w-3 h-3" /> WhatsApp do Cliente</Label>
+              <Input {...register('cliente_whatsapp')} placeholder="Ex: 11999999999" />
             </div>
           </div>
 
@@ -124,15 +132,24 @@ export const NewProjectDialog = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1"><UserPlus className="w-3 h-3" /> Indicação / Parceiro</Label>
-                <Input {...register('indicacao')} placeholder="Nome de quem indicou" />
-              </div>
-              <div className="space-y-2">
-                <Label>Comissão (R$)</Label>
-                <Input type="number" step="0.01" {...register('comissao_valor')} placeholder="Valor da comissão" />
-              </div>
+            <div className="pt-4 border-t border-slate-200">
+                <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm mb-4">
+                  <UserPlus className="w-4 h-4" /> Indicação / Parceiro
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Nome do Indicador</Label>
+                    <Input {...register('indicacao_nome')} placeholder="Quem indicou?" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>WhatsApp Indicador</Label>
+                    <Input {...register('indicacao_whatsapp')} placeholder="Contato do parceiro" />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Valor da Comissão (R$)</Label>
+                    <Input type="number" step="0.01" {...register('comissao_valor')} placeholder="0,00" />
+                  </div>
+                </div>
             </div>
           </div>
 
