@@ -2,15 +2,14 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getTemplates, createTemplate, deleteTemplate } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { getKnowledgeBaseItems, createKnowledgeBaseItem, deleteKnowledgeBaseItem } from "@/lib/api";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, Terminal, Copy, Trash2, FileText, Code, Lightbulb, ChevronRight } from "lucide-react";
+import { Search, Plus, Terminal, Copy, Trash2 } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 
 const KnowledgeBase = () => {
   const queryClient = useQueryClient();
@@ -18,30 +17,31 @@ const KnowledgeBase = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
-  const [selectedTag, setSelectedTag] = useState<string>("todos");
 
   const { data: items, isLoading } = useQuery({
-    queryKey: ['templates'], // Reutilizando a tabela de templates para conhecimento
-    queryFn: getTemplates,
+    queryKey: ['knowledge_base'],
+    queryFn: getKnowledgeBaseItems,
   });
 
   const mutation = useMutation({
-    mutationFn: (data: any) => createTemplate(data),
+    mutationFn: (data: any) => createKnowledgeBaseItem(data),
     onSuccess: () => {
       showSuccess('Salvo com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['templates'] });
+      queryClient.invalidateQueries({ queryKey: ['knowledge_base'] });
       setIsAdding(false);
       setNewTitle("");
       setNewContent("");
-    }
+    },
+    onError: (error: Error) => showError(error.message),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: deleteTemplate,
+    mutationFn: deleteKnowledgeBaseItem,
     onSuccess: () => {
       showSuccess('Removido!');
-      queryClient.invalidateQueries({ queryKey: ['templates'] });
-    }
+      queryClient.invalidateQueries({ queryKey: ['knowledge_base'] });
+    },
+    onError: (error: Error) => showError(error.message),
   });
 
   const copyToClipboard = (text: string) => {
