@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { showSuccess, showError } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DeployApiButton } from "@/components/DeployApiButton";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { Setting } from "@/types";
 
@@ -71,7 +70,6 @@ const Settings = () => {
             <Button variant="outline" size="sm" onClick={() => checkApi()} title="Verificar status novamente">
                 Verificar Status
             </Button>
-            <DeployApiButton />
         </div>
       </div>
 
@@ -102,7 +100,7 @@ const Settings = () => {
                 {isApiError && (
                     <div className="text-sm text-red-700">
                         <p className="font-medium mb-1">Atenção Necessária</p>
-                        <p>Não foi possível acessar as novas funcionalidades. Por favor, clique no botão <strong>"Atualizar API Remota"</strong> acima para corrigir.</p>
+                        <p>Não foi possível acessar as novas funcionalidades. Por favor, atualize o script da API manualmente no servidor para corrigir.</p>
                     </div>
                 )}
             </CardContent>

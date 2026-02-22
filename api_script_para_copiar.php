@@ -1,4 +1,4 @@
-export const PHP_API_CODE = `<?php
+<?php
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
@@ -23,8 +23,8 @@ $pass = 'root123';
 try {
     $pdo = new PDO("mysql:host=$host;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->exec("CREATE DATABASE IF NOT EXISTS \`$db\`");
-    $pdo->exec("USE \`$db\`");
+    $pdo->exec("CREATE DATABASE IF NOT EXISTS `$db`");
+    $pdo->exec("USE `$db`");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS projetos (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -177,4 +177,4 @@ try {
     http_response_code(500);
     echo json_encode(['error' => 'Erro Interno no Servidor: ' . $e->getMessage()]);
 }
-?>`;
+?>
