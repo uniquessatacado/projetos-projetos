@@ -89,6 +89,16 @@ async function readBody(req) {
 }
 
 module.exports = async function handler(req, res) {
+  if (req.method === 'GET' && String(req.query?.selftest || '') === '1') {
+    try {
+      const sample = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAR0lEQVR4nO3XMQoAMAhD0aT0/ldOj+AgJct3FnxkEHWSqFinORwAAACSdKcG26sB05qpJwAAAAAAAAAAGO+B329DPQEAAAA8OZcKPaU0KvwAAAAASUVORK5CYII=', 'base64');
+      const svg = await Promise.resolve(vtracer.convertBuffer(sample, optionsFor('logo', 2)));
+      return res.status(200).json({ ok: typeof svg === 'string' && svg.includes('<svg'), bytes: Buffer.byteLength(svg, 'utf8') });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Use POST para vetorizar.' });
