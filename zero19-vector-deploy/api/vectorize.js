@@ -1,19 +1,57 @@
 const vtracer = require('@visioncortex/vtracer');
 
+const MAX_SVG_BYTES = 3_850_000;
+
 function clampDetail(value) {
-  const n = Math.round(Number(value) || 4);
+  const n = Math.round(Number(value) || 5);
   return Math.min(5, Math.max(1, n));
 }
 
-function optionsFor(preset, detail) {
+function optionsFor(preset, detail, maxColors) {
   const i = clampDetail(detail) - 1;
-  const colorPrecision = [4, 5, 6, 7, 8][i];
-  const filterSpeckle = [12, 8, 5, 3, 1][i];
-  const layerDifference = [12, 9, 6, 3, 1][i];
-  const lengthThreshold = [9, 7, 5, 3.5, 2][i];
-  const maxIterations = [1, 1, 2, 2, 3][i];
-  const pathPrecision = [2, 3, 4, 5, 6][i];
-  const simplify = [2.8, 2.1, 1.5, 1.0, 0.6][i];
+
+  if (preset === 'dtf') {
+    // DTF = fidelidade máxima. Não simplifica curvas e preserva o máximo de
+    // variações de cor possível. O limite de cores só é aplicado como fallback
+    // quando o SVG excederia o limite de resposta da Vercel.
+    const options = {
+      preset: 'poster',
+      clustering: 'color-cluster',
+      hierarchical: 'stacked',
+      mode: 'spline',
+      filterSpeckle: 1,
+      colorPrecision: 8,
+      layerDifference: 1,
+      cornerThreshold: 60,
+      lengthThreshold: 1,
+      maxIterations: 12,
+      spliceThreshold: 45,
+      pathPrecision: 5,
+      optimize: 1,
+    };
+    if (maxColors) options.maxColors = maxColors;
+    return options;
+  }
+
+  if (preset === 'photo') {
+    const options = {
+      preset: 'poster',
+      clustering: 'color-cluster',
+      hierarchical: 'stacked',
+      mode: 'spline',
+      filterSpeckle: [4, 3, 2, 1, 1][i],
+      colorPrecision: 8,
+      layerDifference: [8, 6, 4, 2, 1][i],
+      cornerThreshold: 120,
+      lengthThreshold: [3, 2.5, 2, 1.5, 1][i],
+      maxIterations: [6, 7, 8, 10, 12][i],
+      spliceThreshold: 45,
+      pathPrecision: [3, 3, 4, 4, 5][i],
+      optimize: 1,
+    };
+    if (maxColors) options.maxColors = maxColors;
+    return options;
+  }
 
   if (preset === 'bw') {
     return {
@@ -21,29 +59,11 @@ function optionsFor(preset, detail) {
       clustering: 'bw',
       hierarchical: 'cutout',
       mode: 'spline',
-      filterSpeckle,
-      lengthThreshold,
-      maxIterations,
-      pathPrecision,
-      simplify,
-      optimize: 2,
-    };
-  }
-
-  if (preset === 'photo') {
-    return {
-      preset: 'photo',
-      hierarchical: 'stacked',
-      mode: 'spline',
-      filterSpeckle,
-      colorPrecision,
-      layerDifference,
-      lengthThreshold,
-      maxIterations,
-      pathPrecision,
-      simplify,
-      maxColors: [24, 32, 48, 64, 96][i],
-      optimize: 2,
+      filterSpeckle: [10, 7, 4, 2, 1][i],
+      lengthThreshold: [7, 5, 3, 2, 1][i],
+      maxIterations: [3, 4, 6, 8, 10][i],
+      pathPrecision: [2, 3, 3, 4, 4][i],
+      optimize: 1,
     };
   }
 
@@ -52,28 +72,28 @@ function optionsFor(preset, detail) {
       preset: 'poster',
       hierarchical: 'cutout',
       mode: 'pixel',
-      filterSpeckle: Math.min(3, filterSpeckle),
-      colorPrecision,
-      maxColors: [8, 12, 18, 28, 40][i],
-      optimize: 2,
+      filterSpeckle: 1,
+      colorPrecision: 8,
+      maxColors: [16, 24, 32, 48, 64][i],
+      optimize: 1,
     };
   }
 
   return {
     preset: 'poster',
+    clustering: 'color-cluster',
     hierarchical: 'cutout',
-    mode: preset === 'logo' ? 'polygon' : 'spline',
-    filterSpeckle: preset === 'dtf' ? Math.min(3, filterSpeckle) : filterSpeckle,
-    colorPrecision: preset === 'dtf' ? Math.max(7, colorPrecision) : colorPrecision,
-    layerDifference,
-    cornerThreshold: preset === 'logo' ? 70 : 60,
-    lengthThreshold,
-    maxIterations,
-    spliceThreshold: preset === 'logo' || preset === 'dtf' ? 55 : 45,
-    pathPrecision,
-    simplify,
-    maxColors: preset === 'logo' ? [8, 12, 16, 24, 32][i] : [12, 16, 24, 32, 48][i],
-    optimize: 2,
+    mode: 'spline',
+    filterSpeckle: [6, 4, 3, 2, 1][i],
+    colorPrecision: 8,
+    layerDifference: [10, 8, 6, 4, 2][i],
+    cornerThreshold: 65,
+    lengthThreshold: [6, 4, 3, 2, 1.5][i],
+    maxIterations: [4, 5, 6, 8, 10][i],
+    spliceThreshold: 50,
+    pathPrecision: [2, 3, 3, 4, 4][i],
+    maxColors: [24, 32, 48, 64, 96][i],
+    optimize: 1,
   };
 }
 
@@ -88,12 +108,44 @@ async function readBody(req) {
   return Buffer.concat(chunks);
 }
 
+function traceWithFidelity(input, preset, detail) {
+  const fidelityPreset = preset === 'dtf' || preset === 'photo';
+
+  if (!fidelityPreset) {
+    const svg = vtracer.convertBuffer(input, optionsFor(preset, detail));
+    return {
+      svg,
+      bytes: Buffer.byteLength(svg, 'utf8'),
+      paletteLimit: null,
+    };
+  }
+
+  // Primeiro tenta sem reduzir a paleta. Só reduz se o SVG não couber com
+  // segurança na resposta da Vercel.
+  const attempts = [null, 512, 384, 256, 192, 128];
+  let last = null;
+
+  for (const maxColors of attempts) {
+    const svg = vtracer.convertBuffer(input, optionsFor(preset, detail, maxColors));
+    const bytes = Buffer.byteLength(svg, 'utf8');
+    last = { svg, bytes, paletteLimit: maxColors };
+
+    if (bytes <= MAX_SVG_BYTES) return last;
+  }
+
+  return last;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method === 'GET' && String(req.query?.selftest || '') === '1') {
     try {
       const sample = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAR0lEQVR4nO3XMQoAMAhD0aT0/ldOj+AgJct3FnxkEHWSqFinORwAAACSdKcG26sB05qpJwAAAAAAAAAAGO+B329DPQEAAAA8OZcKPaU0KvwAAAAASUVORK5CYII=', 'base64');
-      const svg = await Promise.resolve(vtracer.convertBuffer(sample, optionsFor('logo', 2)));
-      return res.status(200).json({ ok: typeof svg === 'string' && svg.includes('<svg'), bytes: Buffer.byteLength(svg, 'utf8') });
+      const result = traceWithFidelity(sample, 'dtf', 5);
+      return res.status(200).json({
+        ok: typeof result.svg === 'string' && result.svg.includes('<svg'),
+        bytes: result.bytes,
+        paletteLimit: result.paletteLimit,
+      });
     } catch (error) {
       return res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) });
     }
@@ -109,23 +161,28 @@ module.exports = async function handler(req, res) {
   try {
     const input = await readBody(req);
     if (!input.length) return res.status(400).json({ error: 'Imagem vazia.' });
-    if (input.length > 4_300_000) return res.status(413).json({ error: 'Imagem grande demais para processar. Reduza a resolução.' });
+    if (input.length > 4_300_000) {
+      return res.status(413).json({ error: 'Imagem grande demais para processar. Reduza a resolução.' });
+    }
 
     const preset = String(req.headers['x-zero19-preset'] || 'dtf');
-    const detail = req.headers['x-zero19-detail'] || '4';
+    const detail = req.headers['x-zero19-detail'] || '5';
 
-    const svg = await Promise.resolve(vtracer.convertBuffer(input, optionsFor(preset, detail)));
-    const bytes = Buffer.byteLength(svg, 'utf8');
+    const result = traceWithFidelity(input, preset, detail);
 
-    if (bytes > 4_100_000) {
-      return res.status(413).json({ error: 'O vetor ficou complexo demais. Diminua o nível de detalhe e tente novamente.' });
+    if (!result || result.bytes > MAX_SVG_BYTES) {
+      return res.status(413).json({
+        error: 'Essa arte gerou um vetor extremamente complexo. Para impressão perfeita, use o PNG DTF 300 DPI; para SVG, tente uma imagem mais simples.',
+      });
     }
 
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({
-      svg,
+      svg: result.svg,
       elapsedMs: Date.now() - started,
-      bytes,
+      bytes: result.bytes,
+      paletteLimit: result.paletteLimit,
+      quality: result.paletteLimit ? 'fallback' : 'maximum',
     });
   } catch (error) {
     console.error('ZERO19 vectorize error', error);
