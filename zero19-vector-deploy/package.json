@@ -1,9 +1,9 @@
 {
   "name": "zero19-vector-deploy",
   "private": true,
-  "version": "1.2.3",
+  "version": "1.2.4",
   "scripts": {
-    "build": "rm -rf zero19-vector bundle-v1.2.2.b64 bundle-v1.2.2.tar.gz && cat bundle122.part-* > bundle-v1.2.2.b64 && base64 -d bundle-v1.2.2.b64 > bundle-v1.2.2.tar.gz && tar -xzf bundle-v1.2.2.tar.gz && cd zero19-vector && npm install --no-audit --no-fund && npx vite build && cd .. && node patch-built-version.cjs && echo ZERO19-v1.2.3"
+    "build": "rm -rf zero19-vector bundle-v1.2.2.b64 bundle-v1.2.2.tar.gz && cat bundle122.part-* > bundle-v1.2.2.b64 && base64 -d bundle-v1.2.2.b64 > bundle-v1.2.2.tar.gz && tar -xzf bundle-v1.2.2.tar.gz && cd zero19-vector && npm install --no-audit --no-fund && npx vite build && cd .. && node patch-built-version.cjs && echo ZERO19-v1.2.4"
   },
   "dependencies": {
     "@visioncortex/vtracer": "1.0.0-alpha.4"
