@@ -1,6 +1,7 @@
 const vtracer = require('@visioncortex/vtracer');
+const zlib = require('zlib');
 
-const MAX_SVG_BYTES = 3_850_000;
+const MAX_SVG_BYTES = 80_000_000;
 
 function clampDetail(value) {
   const n = Math.round(Number(value) || 5);
@@ -11,9 +12,6 @@ function optionsFor(preset, detail) {
   const i = clampDetail(detail) - 1;
 
   if (preset === 'dtf') {
-    // DTF HD: uma única passada, sem simplificação de curvas.
-    // Mantém muito mais informação que a versão antiga, mas evita o custo
-    // explosivo de layerDifference=1 + várias re-vectorizações.
     return {
       preset: 'poster',
       clustering: 'color-cluster',
@@ -26,9 +24,9 @@ function optionsFor(preset, detail) {
       lengthThreshold: [4, 3, 2.5, 2, 1.5][i],
       maxIterations: [4, 5, 6, 7, 8][i],
       spliceThreshold: 45,
-      pathPrecision: [3, 3, 4, 4, 4][i],
-      maxColors: [96, 128, 160, 224, 256][i],
-      optimize: 1,
+      pathPrecision: [3, 3, 4, 4, 5][i],
+      maxColors: [128, 192, 256, 384, 512][i],
+      optimize: 2,
     };
   }
 
@@ -45,9 +43,9 @@ function optionsFor(preset, detail) {
       lengthThreshold: [4, 3, 2.5, 2, 1.5][i],
       maxIterations: [4, 5, 6, 7, 8][i],
       spliceThreshold: 45,
-      pathPrecision: [3, 3, 4, 4, 4][i],
-      maxColors: [96, 128, 160, 224, 256][i],
-      optimize: 1,
+      pathPrecision: [3, 3, 4, 4, 5][i],
+      maxColors: [128, 192, 256, 384, 512][i],
+      optimize: 2,
     };
   }
 
@@ -61,7 +59,7 @@ function optionsFor(preset, detail) {
       lengthThreshold: [7, 5, 3, 2, 1][i],
       maxIterations: [3, 4, 6, 8, 10][i],
       pathPrecision: [2, 3, 3, 4, 4][i],
-      optimize: 1,
+      optimize: 2,
     };
   }
 
@@ -73,7 +71,7 @@ function optionsFor(preset, detail) {
       filterSpeckle: 1,
       colorPrecision: 8,
       maxColors: [16, 24, 32, 48, 64][i],
-      optimize: 1,
+      optimize: 2,
     };
   }
 
@@ -91,7 +89,7 @@ function optionsFor(preset, detail) {
     spliceThreshold: 50,
     pathPrecision: [2, 3, 3, 4, 4][i],
     maxColors: [24, 32, 48, 64, 96][i],
-    optimize: 1,
+    optimize: 2,
   };
 }
 
@@ -107,15 +105,34 @@ async function readBody(req) {
 }
 
 function trace(input, preset, detail) {
-  const svg = vtracer.convertBuffer(input, optionsFor(preset, detail));
+  const options = optionsFor(preset, detail);
+  const svg = vtracer.convertBuffer(input, options);
   return {
     svg,
     bytes: Buffer.byteLength(svg, 'utf8'),
-    paletteLimit:
-      preset === 'dtf' || preset === 'photo'
-        ? optionsFor(preset, detail).maxColors
-        : null,
+    paletteLimit: options.maxColors || null,
   };
+}
+
+function sendCompressedJson(res, payload) {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Encoding', 'gzip');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Vary', 'Accept-Encoding');
+
+  const gzip = zlib.createGzip({ level: 6 });
+  gzip.on('error', (error) => {
+    console.error('ZERO19 gzip error', error);
+    if (!res.headersSent) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: 'Falha ao compactar o SVG.' }));
+    } else {
+      res.destroy(error);
+    }
+  });
+  gzip.pipe(res);
+  gzip.end(JSON.stringify(payload));
 }
 
 module.exports = async function handler(req, res) {
@@ -150,25 +167,30 @@ module.exports = async function handler(req, res) {
     const preset = String(req.headers['x-zero19-preset'] || 'dtf');
     const detail = req.headers['x-zero19-detail'] || '5';
     const result = trace(input, preset, detail);
+    const elapsedMs = Date.now() - started;
 
-    if (!result || result.bytes > MAX_SVG_BYTES) {
+    if (result.bytes > MAX_SVG_BYTES) {
       return res.status(413).json({
-        error: 'O SVG ficou grande demais. Para impressão com fidelidade máxima, use o PNG DTF Premium 300 DPI.',
+        error: 'O vetor ultrapassou 80 MB. Reduza um nível de detalhe ou use o PNG DTF Premium.',
       });
     }
 
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).json({
+    res.setHeader('X-Zero19-Svg-Bytes', String(result.bytes));
+    res.setHeader('X-Zero19-Elapsed-Ms', String(elapsedMs));
+    sendCompressedJson(res, {
       svg: result.svg,
-      elapsedMs: Date.now() - started,
+      elapsedMs,
       bytes: result.bytes,
       paletteLimit: result.paletteLimit,
-      quality: 'hd-single-pass',
+      quality: 'hd-gzip-stream',
     });
   } catch (error) {
     console.error('ZERO19 vectorize error', error);
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Falha ao vetorizar a imagem.',
-    });
+    if (!res.headersSent) {
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : 'Falha ao vetorizar a imagem.',
+      });
+    }
+    res.destroy(error instanceof Error ? error : new Error(String(error)));
   }
 };
