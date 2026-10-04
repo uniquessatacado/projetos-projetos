@@ -1,7 +1,7 @@
 {
   "name": "zero19-vector-deploy",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "scripts": {
     "build": "rm -rf zero19-vector app-v1.2.b64 app-v1.2.tar.gz && cat v12-part-* > app-v1.2.b64 && base64 -d app-v1.2.b64 > app-v1.2.tar.gz && tar -xzf app-v1.2.tar.gz && cd zero19-vector && npm install --no-audit --no-fund && npx vite build"
   },
