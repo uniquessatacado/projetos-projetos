@@ -4,7 +4,7 @@
   "outputDirectory": "zero19-vector/dist",
   "functions": {
     "api/vectorize.js": {
-      "maxDuration": 60,
+      "maxDuration": 300,
       "supportsCancellation": true
     }
   }
