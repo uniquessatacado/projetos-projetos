@@ -1,11 +1,11 @@
 {
-  "installCommand": "npm install --no-audit --no-fund",
-  "buildCommand": "npm run build",
-  "outputDirectory": "zero19-vector/dist",
-  "functions": {
-    "api/vectorize.js": {
-      "maxDuration": 300,
-      "supportsCancellation": true
+    "installCommand": "npm install --no-audit --no-fund",
+    "buildCommand": "npm run build",
+    "outputDirectory": "zero19-vector/dist",
+    "functions": {
+        "api/vectorize.js": {
+            "maxDuration": 300,
+            "supportsCancellation": true
+        }
     }
-  }
 }
