@@ -1,8 +1,11 @@
 {
   "name": "zero19-vector-deploy",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scripts": {
-    "build": "rm -rf zero19-vector app.tar.gz app.tar.gz.b64 && cat app.b64.part-* > app.tar.gz.b64 && base64 -d app.tar.gz.b64 > app.tar.gz && tar -xzf app.tar.gz && cd zero19-vector && npm install --force --no-audit --no-fund && npx vite build"
+    "build": "rm -rf zero19-vector app.tar.gz app.tar.gz.b64 && cat app.b64.part-* > app.tar.gz.b64 && base64 -d app.tar.gz.b64 > app.tar.gz && tar -xzf app.tar.gz && cd zero19-vector && npm install --no-audit --no-fund && npx vite build"
+  },
+  "dependencies": {
+    "@visioncortex/vtracer": "1.0.0-alpha.4"
   }
 }
