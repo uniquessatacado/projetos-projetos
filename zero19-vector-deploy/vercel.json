@@ -1,13 +1,11 @@
 {
+  "installCommand": "npm install --no-audit --no-fund",
   "buildCommand": "npm run build",
   "outputDirectory": "zero19-vector/dist",
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
-        { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
-      ]
+  "functions": {
+    "api/vectorize.js": {
+      "maxDuration": 60,
+      "supportsCancellation": true
     }
-  ]
+  }
 }
