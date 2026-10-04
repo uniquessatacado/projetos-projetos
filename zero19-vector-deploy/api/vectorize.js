@@ -7,50 +7,48 @@ function clampDetail(value) {
   return Math.min(5, Math.max(1, n));
 }
 
-function optionsFor(preset, detail, maxColors) {
+function optionsFor(preset, detail) {
   const i = clampDetail(detail) - 1;
 
   if (preset === 'dtf') {
-    // DTF = fidelidade máxima. Não simplifica curvas e preserva o máximo de
-    // variações de cor possível. O limite de cores só é aplicado como fallback
-    // quando o SVG excederia o limite de resposta da Vercel.
-    const options = {
+    // DTF HD: uma única passada, sem simplificação de curvas.
+    // Mantém muito mais informação que a versão antiga, mas evita o custo
+    // explosivo de layerDifference=1 + várias re-vectorizações.
+    return {
       preset: 'poster',
       clustering: 'color-cluster',
       hierarchical: 'stacked',
       mode: 'spline',
       filterSpeckle: 1,
       colorPrecision: 8,
-      layerDifference: 1,
-      cornerThreshold: 60,
-      lengthThreshold: 1,
-      maxIterations: 12,
+      layerDifference: [10, 8, 6, 5, 4][i],
+      cornerThreshold: 70,
+      lengthThreshold: [4, 3, 2.5, 2, 1.5][i],
+      maxIterations: [4, 5, 6, 7, 8][i],
       spliceThreshold: 45,
-      pathPrecision: 5,
+      pathPrecision: [3, 3, 4, 4, 4][i],
+      maxColors: [96, 128, 160, 224, 256][i],
       optimize: 1,
     };
-    if (maxColors) options.maxColors = maxColors;
-    return options;
   }
 
   if (preset === 'photo') {
-    const options = {
+    return {
       preset: 'poster',
       clustering: 'color-cluster',
       hierarchical: 'stacked',
       mode: 'spline',
-      filterSpeckle: [4, 3, 2, 1, 1][i],
+      filterSpeckle: [5, 4, 3, 2, 1][i],
       colorPrecision: 8,
-      layerDifference: [8, 6, 4, 2, 1][i],
+      layerDifference: [14, 10, 8, 6, 5][i],
       cornerThreshold: 120,
-      lengthThreshold: [3, 2.5, 2, 1.5, 1][i],
-      maxIterations: [6, 7, 8, 10, 12][i],
+      lengthThreshold: [4, 3, 2.5, 2, 1.5][i],
+      maxIterations: [4, 5, 6, 7, 8][i],
       spliceThreshold: 45,
-      pathPrecision: [3, 3, 4, 4, 5][i],
+      pathPrecision: [3, 3, 4, 4, 4][i],
+      maxColors: [96, 128, 160, 224, 256][i],
       optimize: 1,
     };
-    if (maxColors) options.maxColors = maxColors;
-    return options;
   }
 
   if (preset === 'bw') {
@@ -108,39 +106,23 @@ async function readBody(req) {
   return Buffer.concat(chunks);
 }
 
-function traceWithFidelity(input, preset, detail) {
-  const fidelityPreset = preset === 'dtf' || preset === 'photo';
-
-  if (!fidelityPreset) {
-    const svg = vtracer.convertBuffer(input, optionsFor(preset, detail));
-    return {
-      svg,
-      bytes: Buffer.byteLength(svg, 'utf8'),
-      paletteLimit: null,
-    };
-  }
-
-  // Primeiro tenta sem reduzir a paleta. Só reduz se o SVG não couber com
-  // segurança na resposta da Vercel.
-  const attempts = [null, 512, 384, 256, 192, 128];
-  let last = null;
-
-  for (const maxColors of attempts) {
-    const svg = vtracer.convertBuffer(input, optionsFor(preset, detail, maxColors));
-    const bytes = Buffer.byteLength(svg, 'utf8');
-    last = { svg, bytes, paletteLimit: maxColors };
-
-    if (bytes <= MAX_SVG_BYTES) return last;
-  }
-
-  return last;
+function trace(input, preset, detail) {
+  const svg = vtracer.convertBuffer(input, optionsFor(preset, detail));
+  return {
+    svg,
+    bytes: Buffer.byteLength(svg, 'utf8'),
+    paletteLimit:
+      preset === 'dtf' || preset === 'photo'
+        ? optionsFor(preset, detail).maxColors
+        : null,
+  };
 }
 
 module.exports = async function handler(req, res) {
   if (req.method === 'GET' && String(req.query?.selftest || '') === '1') {
     try {
       const sample = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAR0lEQVR4nO3XMQoAMAhD0aT0/ldOj+AgJct3FnxkEHWSqFinORwAAACSdKcG26sB05qpJwAAAAAAAAAAGO+B329DPQEAAAA8OZcKPaU0KvwAAAAASUVORK5CYII=', 'base64');
-      const result = traceWithFidelity(sample, 'dtf', 5);
+      const result = trace(sample, 'dtf', 5);
       return res.status(200).json({
         ok: typeof result.svg === 'string' && result.svg.includes('<svg'),
         bytes: result.bytes,
@@ -167,12 +149,11 @@ module.exports = async function handler(req, res) {
 
     const preset = String(req.headers['x-zero19-preset'] || 'dtf');
     const detail = req.headers['x-zero19-detail'] || '5';
-
-    const result = traceWithFidelity(input, preset, detail);
+    const result = trace(input, preset, detail);
 
     if (!result || result.bytes > MAX_SVG_BYTES) {
       return res.status(413).json({
-        error: 'Essa arte gerou um vetor extremamente complexo. Para impressão perfeita, use o PNG DTF 300 DPI; para SVG, tente uma imagem mais simples.',
+        error: 'O SVG ficou grande demais. Para impressão com fidelidade máxima, use o PNG DTF Premium 300 DPI.',
       });
     }
 
@@ -182,7 +163,7 @@ module.exports = async function handler(req, res) {
       elapsedMs: Date.now() - started,
       bytes: result.bytes,
       paletteLimit: result.paletteLimit,
-      quality: result.paletteLimit ? 'fallback' : 'maximum',
+      quality: 'hd-single-pass',
     });
   } catch (error) {
     console.error('ZERO19 vectorize error', error);
